@@ -14,13 +14,15 @@ import { THEME_PRESETS, ThemeId } from '../theme';
 export function SettingsScreen() {
   const {
     appData,
-    habits,
+    allHabits,
+    hiddenHabits,
     groups,
     settings,
     theme,
     addGroup,
     deleteGroup,
     replaceAppData,
+    restoreHabit,
     setThemeId,
   } = useHabits();
 
@@ -29,7 +31,7 @@ export function SettingsScreen() {
   const [busyAction, setBusyAction] = useState<'backup' | 'restore' | null>(null);
 
   const handleDeleteGroup = (groupId: string, groupName: string) => {
-    const usageCount = getGroupUsageCount(habits, groupId);
+    const usageCount = getGroupUsageCount(allHabits, groupId);
 
     Alert.alert(
       '确认删除分组',
@@ -170,7 +172,7 @@ export function SettingsScreen() {
           ) : (
             <View style={styles.groupList}>
               {groups.map((group) => {
-                const usageCount = getGroupUsageCount(habits, group.id);
+                const usageCount = getGroupUsageCount(allHabits, group.id);
                 return (
                   <View key={group.id} style={styles.groupRow}>
                     <View style={styles.groupMeta}>
@@ -186,6 +188,31 @@ export function SettingsScreen() {
                   </View>
                 );
               })}
+            </View>
+          )}
+        </View>
+
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionTitle}>已隐藏的习惯</Text>
+          <Text style={styles.sectionDescription}>隐藏后的习惯会从首页和历史页移除，但数据会保留，可在这里恢复。</Text>
+          {hiddenHabits.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>没有隐藏的习惯</Text>
+              <Text style={styles.emptyDescription}>如果你把习惯隐藏了，会在这里看到恢复入口。</Text>
+            </View>
+          ) : (
+            <View style={styles.groupList}>
+              {hiddenHabits.map((habit) => (
+                <View key={habit.id} style={styles.groupRow}>
+                  <View style={styles.groupMeta}>
+                    <Text style={styles.groupName}>{habit.name}</Text>
+                    <Text style={styles.groupUsage}>{habit.checkins.length} 条历史记录</Text>
+                  </View>
+                  <TouchableOpacity onPress={() => restoreHabit(habit.id)} style={styles.inlineButton}>
+                    <Text style={styles.inlineButtonText}>恢复</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
             </View>
           )}
         </View>

@@ -24,6 +24,7 @@ export function HomeScreen({ onOpenHistory }: HomeScreenProps) {
     groups,
     settings,
     theme,
+    hideHabit,
     deleteHabit,
     addCheckin,
     removeLatestTodayCheckin,
@@ -70,6 +71,22 @@ export function HomeScreen({ onOpenHistory }: HomeScreenProps) {
     return nextSections;
   }, [groups, habits]);
 
+  const handleHideHabit = (habitId: string, habitName: string) => {
+    Alert.alert(
+      '隐藏习惯',
+      `隐藏“${habitName}”后，它会从首页和历史页移除，但不会删除数据，可在设置中恢复。`,
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '确认隐藏',
+          onPress: () => {
+            hideHabit(habitId);
+          },
+        },
+      ]
+    );
+  };
+
   const handleDeleteHabit = (habitId: string, habitName: string) => {
     Alert.alert(
       '确认删除习惯',
@@ -115,8 +132,10 @@ export function HomeScreen({ onOpenHistory }: HomeScreenProps) {
           <Text style={styles.sectionTitle}>习惯列表</Text>
           {sections.length === 0 ? (
             <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>还没有习惯</Text>
-              <Text style={styles.emptyDescription}>先创建一个习惯，首页就会开始显示今日打卡次数。</Text>
+              <Text style={styles.emptyTitle}>还没有可显示的习惯</Text>
+              <Text style={styles.emptyDescription}>
+                先创建一个习惯，或者到设置页恢复已隐藏的习惯。
+              </Text>
             </View>
           ) : (
             sections.map((section) => (
@@ -130,6 +149,7 @@ export function HomeScreen({ onOpenHistory }: HomeScreenProps) {
                       groupName={section.id === 'ungrouped' ? null : section.title}
                       onAddCheckin={addCheckin}
                       onRemoveCheckin={removeLatestTodayCheckin}
+                      onHideHabit={handleHideHabit}
                       onDeleteHabit={handleDeleteHabit}
                       onOpenToday={setTodayHabit}
                       onOpenHistory={onOpenHistory}

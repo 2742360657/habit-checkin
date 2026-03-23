@@ -10,6 +10,7 @@ type HabitCardProps = {
   groupName?: string | null;
   onAddCheckin: (habitId: string) => void;
   onRemoveCheckin: (habitId: string) => void;
+  onHideHabit: (habitId: string, habitName: string) => void;
   onDeleteHabit: (habitId: string, habitName: string) => void;
   onOpenToday: (habit: Habit) => void;
   onOpenHistory: (habitId: string) => void;
@@ -20,6 +21,7 @@ export function HabitCard({
   groupName,
   onAddCheckin,
   onRemoveCheckin,
+  onHideHabit,
   onDeleteHabit,
   onOpenToday,
   onOpenHistory,
@@ -36,9 +38,14 @@ export function HabitCard({
           <Text style={styles.name}>{habit.name}</Text>
           <Text style={styles.meta}>今日打卡次数</Text>
         </View>
-        <TouchableOpacity onPress={() => onDeleteHabit(habit.id, habit.name)} style={styles.deleteButton}>
-          <Text style={styles.deleteButtonText}>删除</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity onPress={() => onHideHabit(habit.id, habit.name)} style={styles.hideButton}>
+            <Text style={styles.hideButtonText}>隐藏</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => onDeleteHabit(habit.id, habit.name)} style={styles.deleteButton}>
+            <Text style={styles.deleteButtonText}>删除</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.countBlock}>
@@ -95,6 +102,9 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       flex: 1,
       gap: 4,
     },
+    headerActions: {
+      gap: 8,
+    },
     groupTag: {
       alignSelf: 'flex-start',
       borderRadius: 10,
@@ -112,6 +122,17 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     },
     meta: {
       fontSize: 12,
+      color: theme.colors.textSecondary,
+    },
+    hideButton: {
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    hideButtonText: {
+      fontSize: 12,
+      fontWeight: '600',
       color: theme.colors.textSecondary,
     },
     deleteButton: {

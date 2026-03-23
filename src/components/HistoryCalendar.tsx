@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useHabits } from '../state/HabitStore';
 import { getDaysInMonth, getMonthStartWeekday, WEEKDAY_LABELS } from '../utils/date';
@@ -9,6 +9,8 @@ type HistoryCalendarProps = {
   monthIndex: number;
   dateCountMap: Record<string, number>;
   compact?: boolean;
+  selectedDateKey?: string | null;
+  onPressDay?: (dateKey: string, count: number) => void;
 };
 
 type CalendarCell = {
@@ -51,6 +53,8 @@ export function HistoryCalendar({
   monthIndex,
   dateCountMap,
   compact = false,
+  selectedDateKey = null,
+  onPressDay,
 }: HistoryCalendarProps) {
   const { theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -72,14 +76,18 @@ export function HistoryCalendar({
           }
 
           const isActive = cell.count > 0;
+          const isSelected = selectedDateKey === cell.key;
 
           return (
-            <View
+            <TouchableOpacity
               key={cell.key}
+              disabled={!isActive || !onPressDay}
+              onPress={() => onPressDay?.(cell.key, cell.count)}
               style={[
                 styles.cell,
                 compact && styles.cellCompact,
                 isActive ? styles.activeCell : styles.idleCell,
+                isSelected && styles.selectedCell,
               ]}
             >
               <Text
@@ -87,6 +95,7 @@ export function HistoryCalendar({
                   styles.dayText,
                   compact && styles.dayTextCompact,
                   isActive && styles.activeDayText,
+                  isSelected && styles.selectedText,
                 ]}
               >
                 {cell.day}
@@ -96,12 +105,13 @@ export function HistoryCalendar({
                   styles.countText,
                   compact && styles.countTextCompact,
                   isActive && styles.activeCountText,
+                  isSelected && styles.selectedText,
                 ]}
                 numberOfLines={1}
               >
                 {cell.count > 0 ? `${cell.count}次` : ''}
               </Text>
-            </View>
+            </TouchableOpacity>
           );
         })}
       </View>
@@ -153,6 +163,9 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     activeCell: {
       backgroundColor: theme.colors.primarySoft,
     },
+    selectedCell: {
+      backgroundColor: theme.colors.primary,
+    },
     dayText: {
       fontSize: 14,
       fontWeight: '700',
@@ -174,6 +187,9 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     activeCountText: {
       color: theme.colors.primary,
       fontWeight: '700',
+    },
+    selectedText: {
+      color: theme.colors.white,
     },
   });
 }

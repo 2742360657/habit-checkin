@@ -8,6 +8,12 @@ export function getTodayCheckins(habit: Habit) {
     .sort((left, right) => right - left);
 }
 
+export function getCheckinsByDate(habit: Habit, dateKey: string) {
+  return habit.checkins
+    .filter((timestamp) => toLocalDateKey(timestamp) === dateKey)
+    .sort((left, right) => right - left);
+}
+
 export function getTodayCount(habit: Habit) {
   return getTodayCheckins(habit).length;
 }

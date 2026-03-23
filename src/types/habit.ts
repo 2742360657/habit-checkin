@@ -5,6 +5,7 @@ export type Habit = {
   name: string;
   groupId: string | null;
   createdAt: number;
+  hiddenAt: number | null;
   checkins: number[];
 };
 

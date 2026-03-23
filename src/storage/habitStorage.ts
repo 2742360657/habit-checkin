@@ -65,6 +65,7 @@ function sanitizeHabit(candidate: unknown): Habit | null {
     name: raw.name.trim(),
     groupId: typeof raw.groupId === 'string' ? raw.groupId : null,
     createdAt: raw.createdAt,
+    hiddenAt: typeof raw.hiddenAt === 'number' ? raw.hiddenAt : null,
     checkins: raw.checkins.filter((value): value is number => typeof value === 'number'),
   };
 }
@@ -143,6 +144,7 @@ function migrateLegacyData(candidate: unknown): AppData {
       sanitizeHabit({
         ...habit,
         groupId: null,
+        hiddenAt: null,
       })
     )
     .filter((habit): habit is Habit => habit !== null)

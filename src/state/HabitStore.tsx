@@ -8,8 +8,13 @@ import {
   useReducer,
 } from 'react';
 
+import {
+  DEFAULT_HOME_HERO_DESCRIPTION,
+  DEFAULT_HOME_HERO_TITLE,
+  loadAppDataFromDisk,
+  saveAppDataToDisk,
+} from '../storage/habitStorage';
 import { DEFAULT_THEME_ID, getTheme, ThemeId } from '../theme';
-import { loadAppDataFromDisk, saveAppDataToDisk } from '../storage/habitStorage';
 import { AppData, AppSettings, Habit, HabitGroup } from '../types/habit';
 import { createId } from '../utils/id';
 import { getTodayCheckins } from '../utils/habit';
@@ -33,12 +38,18 @@ type HabitAction =
   | { type: 'add-group'; name: string }
   | { type: 'delete-group'; groupId: string }
   | { type: 'add-habit'; name: string; groupId: string | null }
+  | { type: 'hide-habit'; habitId: string }
+  | { type: 'restore-habit'; habitId: string }
   | { type: 'delete-habit'; habitId: string }
   | { type: 'add-checkin'; habitId: string }
-  | { type: 'remove-latest-today-checkin'; habitId: string };
+  | { type: 'remove-latest-today-checkin'; habitId: string }
+  | { type: 'delete-checkin'; habitId: string; timestamp: number }
+  | { type: 'update-checkin-time'; habitId: string; oldTimestamp: number; newTimestamp: number };
 
 type HabitContextValue = HabitState & {
+  allHabits: Habit[];
   habits: Habit[];
+  hiddenHabits: Habit[];
   groups: HabitGroup[];
   settings: AppSettings;
   theme: ReturnType<typeof getTheme>;
@@ -46,9 +57,13 @@ type HabitContextValue = HabitState & {
   addGroup: (name: string) => boolean;
   deleteGroup: (groupId: string) => void;
   addHabit: (name: string, groupId: string | null) => boolean;
+  hideHabit: (habitId: string) => void;
+  restoreHabit: (habitId: string) => void;
   deleteHabit: (habitId: string) => void;
   addCheckin: (habitId: string) => void;
   removeLatestTodayCheckin: (habitId: string) => void;
+  deleteCheckin: (habitId: string, timestamp: number) => void;
+  updateCheckinTime: (habitId: string, oldTimestamp: number, newTimestamp: number) => void;
   setSelectedHabitId: (habitId: string | null) => void;
   setThemeId: (themeId: ThemeId) => void;
   updateHomeCopy: (title: string, description: string) => boolean;
@@ -64,8 +79,8 @@ const initialState: HabitState = {
     groups: [],
     settings: {
       themeId: DEFAULT_THEME_ID,
-      homeHeroTitle: '',
-      homeHeroDescription: '',
+      homeHeroTitle: DEFAULT_HOME_HERO_TITLE,
+      homeHeroDescription: DEFAULT_HOME_HERO_DESCRIPTION,
     },
   },
   isLoading: true,
@@ -74,28 +89,30 @@ const initialState: HabitState = {
   selectedHabitId: null,
 };
 
-function resolveSelectedHabitId(
-  selectedHabitId: string | null,
-  habits: Habit[],
-  fallbackToFirst = true
-) {
+function getVisibleHabits(habits: Habit[]) {
+  return habits.filter((habit) => habit.hiddenAt === null);
+}
+
+function resolveSelectedHabitId(selectedHabitId: string | null, habits: Habit[]) {
   if (selectedHabitId && habits.some((habit) => habit.id === selectedHabitId)) {
     return selectedHabitId;
   }
 
-  return fallbackToFirst ? (habits[0]?.id ?? null) : null;
+  return habits[0]?.id ?? null;
 }
 
 function habitReducer(state: HabitState, action: HabitAction): HabitState {
   switch (action.type) {
-    case 'hydrate':
+    case 'hydrate': {
+      const visibleHabits = getVisibleHabits(action.appData.habits);
       return {
         ...state,
         appData: action.appData,
         isLoading: false,
         isHydrated: true,
-        selectedHabitId: resolveSelectedHabitId(null, action.appData.habits),
+        selectedHabitId: resolveSelectedHabitId(null, visibleHabits),
       };
+    }
     case 'set-error':
       return {
         ...state,
@@ -111,12 +128,14 @@ function habitReducer(state: HabitState, action: HabitAction): HabitState {
         ...state,
         selectedHabitId: action.habitId,
       };
-    case 'replace-app-data':
+    case 'replace-app-data': {
+      const visibleHabits = getVisibleHabits(action.appData.habits);
       return {
         ...state,
         appData: action.appData,
-        selectedHabitId: resolveSelectedHabitId(state.selectedHabitId, action.appData.habits),
+        selectedHabitId: resolveSelectedHabitId(state.selectedHabitId, visibleHabits),
       };
+    }
     case 'set-theme-id':
       return {
         ...state,
@@ -172,28 +191,58 @@ function habitReducer(state: HabitState, action: HabitAction): HabitState {
         name: action.name,
         groupId: action.groupId,
         createdAt: Date.now(),
+        hiddenAt: null,
         checkins: [],
       };
 
-      const habits = [...state.appData.habits, nextHabit];
+      const allHabits = [...state.appData.habits, nextHabit];
+      const visibleHabits = getVisibleHabits(allHabits);
+
       return {
         ...state,
         appData: {
           ...state.appData,
-          habits,
+          habits: allHabits,
         },
-        selectedHabitId: resolveSelectedHabitId(state.selectedHabitId ?? nextHabit.id, habits),
+        selectedHabitId: resolveSelectedHabitId(nextHabit.id, visibleHabits),
       };
     }
-    case 'delete-habit': {
-      const habits = state.appData.habits.filter((habit) => habit.id !== action.habitId);
+    case 'hide-habit': {
+      const allHabits = state.appData.habits.map((habit) =>
+        habit.id === action.habitId ? { ...habit, hiddenAt: Date.now() } : habit
+      );
+      const visibleHabits = getVisibleHabits(allHabits);
+
       return {
         ...state,
         appData: {
           ...state.appData,
-          habits,
+          habits: allHabits,
         },
-        selectedHabitId: resolveSelectedHabitId(state.selectedHabitId, habits),
+        selectedHabitId: resolveSelectedHabitId(state.selectedHabitId, visibleHabits),
+      };
+    }
+    case 'restore-habit':
+      return {
+        ...state,
+        appData: {
+          ...state.appData,
+          habits: state.appData.habits.map((habit) =>
+            habit.id === action.habitId ? { ...habit, hiddenAt: null } : habit
+          ),
+        },
+      };
+    case 'delete-habit': {
+      const allHabits = state.appData.habits.filter((habit) => habit.id !== action.habitId);
+      const visibleHabits = getVisibleHabits(allHabits);
+
+      return {
+        ...state,
+        appData: {
+          ...state.appData,
+          habits: allHabits,
+        },
+        selectedHabitId: resolveSelectedHabitId(state.selectedHabitId, visibleHabits),
       };
     }
     case 'add-checkin':
@@ -242,6 +291,56 @@ function habitReducer(state: HabitState, action: HabitAction): HabitState {
           }),
         },
       };
+    case 'delete-checkin':
+      return {
+        ...state,
+        appData: {
+          ...state.appData,
+          habits: state.appData.habits.map((habit) => {
+            if (habit.id !== action.habitId) {
+              return habit;
+            }
+
+            const nextCheckins = [...habit.checkins];
+            const removeIndex = nextCheckins.lastIndexOf(action.timestamp);
+            if (removeIndex < 0) {
+              return habit;
+            }
+
+            nextCheckins.splice(removeIndex, 1);
+            return {
+              ...habit,
+              checkins: nextCheckins,
+            };
+          }),
+        },
+      };
+    case 'update-checkin-time':
+      return {
+        ...state,
+        appData: {
+          ...state.appData,
+          habits: state.appData.habits.map((habit) => {
+            if (habit.id !== action.habitId) {
+              return habit;
+            }
+
+            const nextCheckins = [...habit.checkins];
+            const updateIndex = nextCheckins.lastIndexOf(action.oldTimestamp);
+            if (updateIndex < 0) {
+              return habit;
+            }
+
+            nextCheckins[updateIndex] = action.newTimestamp;
+            nextCheckins.sort((left, right) => left - right);
+
+            return {
+              ...habit,
+              checkins: nextCheckins,
+            };
+          }),
+        },
+      };
     default:
       return state;
   }
@@ -270,16 +369,7 @@ export function HabitProvider({ children }: PropsWithChildren) {
         });
         dispatch({
           type: 'hydrate',
-          appData: {
-            version: 2,
-            habits: [],
-            groups: [],
-            settings: {
-              themeId: DEFAULT_THEME_ID,
-              homeHeroTitle: '',
-              homeHeroDescription: '',
-            },
-          },
+          appData: initialState.appData,
         });
       }
     }
@@ -351,6 +441,14 @@ export function HabitProvider({ children }: PropsWithChildren) {
     [state.appData.groups]
   );
 
+  const hideHabit = useCallback((habitId: string) => {
+    dispatch({ type: 'hide-habit', habitId });
+  }, []);
+
+  const restoreHabit = useCallback((habitId: string) => {
+    dispatch({ type: 'restore-habit', habitId });
+  }, []);
+
   const deleteHabit = useCallback((habitId: string) => {
     dispatch({ type: 'delete-habit', habitId });
   }, []);
@@ -362,6 +460,17 @@ export function HabitProvider({ children }: PropsWithChildren) {
   const removeLatestTodayCheckin = useCallback((habitId: string) => {
     dispatch({ type: 'remove-latest-today-checkin', habitId });
   }, []);
+
+  const deleteCheckin = useCallback((habitId: string, timestamp: number) => {
+    dispatch({ type: 'delete-checkin', habitId, timestamp });
+  }, []);
+
+  const updateCheckinTime = useCallback(
+    (habitId: string, oldTimestamp: number, newTimestamp: number) => {
+      dispatch({ type: 'update-checkin-time', habitId, oldTimestamp, newTimestamp });
+    },
+    []
+  );
 
   const setSelectedHabitId = useCallback((habitId: string | null) => {
     dispatch({ type: 'select-habit', habitId });
@@ -392,10 +501,16 @@ export function HabitProvider({ children }: PropsWithChildren) {
     dispatch({ type: 'replace-app-data', appData });
   }, []);
 
-  const value = useMemo(
-    () => ({
+  const value = useMemo(() => {
+    const allHabits = state.appData.habits;
+    const habits = allHabits.filter((habit) => habit.hiddenAt === null);
+    const hiddenHabits = allHabits.filter((habit) => habit.hiddenAt !== null);
+
+    return {
       ...state,
-      habits: state.appData.habits,
+      allHabits,
+      habits,
+      hiddenHabits,
       groups: state.appData.groups,
       settings: state.appData.settings,
       theme: getTheme(state.appData.settings.themeId),
@@ -403,29 +518,36 @@ export function HabitProvider({ children }: PropsWithChildren) {
       addGroup,
       deleteGroup,
       addHabit,
+      hideHabit,
+      restoreHabit,
       deleteHabit,
       addCheckin,
       removeLatestTodayCheckin,
+      deleteCheckin,
+      updateCheckinTime,
       setSelectedHabitId,
       setThemeId,
       updateHomeCopy,
       replaceAppData,
-    }),
-    [
-      state,
-      clearError,
-      addGroup,
-      deleteGroup,
-      addHabit,
-      deleteHabit,
-      addCheckin,
-      removeLatestTodayCheckin,
-      setSelectedHabitId,
-      setThemeId,
-      updateHomeCopy,
-      replaceAppData,
-    ]
-  );
+    };
+  }, [
+    state,
+    clearError,
+    addGroup,
+    deleteGroup,
+    addHabit,
+    hideHabit,
+    restoreHabit,
+    deleteHabit,
+    addCheckin,
+    removeLatestTodayCheckin,
+    deleteCheckin,
+    updateCheckinTime,
+    setSelectedHabitId,
+    setThemeId,
+    updateHomeCopy,
+    replaceAppData,
+  ]);
 
   return <HabitContext.Provider value={value}>{children}</HabitContext.Provider>;
 }

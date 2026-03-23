@@ -6,8 +6,10 @@ node_modules/
 # Expo
 .expo/
 dist/
+dist-test/
 web-build/
 expo-env.d.ts
+.cache/
 
 # Native
 .kotlin/

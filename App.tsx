@@ -1,20 +1,185 @@
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+
+import { HistoryScreen } from './src/screens/HistoryScreen';
+import { HomeScreen } from './src/screens/HomeScreen';
+import { SettingsScreen } from './src/screens/SettingsScreen';
+import { HabitProvider, useHabits } from './src/state/HabitStore';
+
+type AppTab = 'home' | 'history' | 'settings';
+
+function AppShell() {
+  const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const hasShownErrorRef = useRef<string | null>(null);
+  const { isLoading, error, clearError, theme, selectedHabitId, setSelectedHabitId } = useHabits();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+
+  useEffect(() => {
+    if (!error || hasShownErrorRef.current === error) {
+      return;
+    }
+
+    hasShownErrorRef.current = error;
+    Alert.alert('存储提示', error, [
+      {
+        text: '知道了',
+        onPress: () => {
+          clearError();
+          hasShownErrorRef.current = null;
+        },
+      },
+    ]);
+  }, [error, clearError]);
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="dark" />
+      <View style={styles.app}>
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.title}>习惯打卡</Text>
+            <Text style={styles.subtitle}>本地存储 · 简洁工具型 Android MVP</Text>
+          </View>
+          <View style={styles.tabBar}>
+            <TabButton
+              label="习惯"
+              isActive={activeTab === 'home'}
+              onPress={() => setActiveTab('home')}
+            />
+            <TabButton
+              label="历史"
+              isActive={activeTab === 'history'}
+              onPress={() => setActiveTab('history')}
+            />
+            <TabButton
+              label="设置"
+              isActive={activeTab === 'settings'}
+              onPress={() => setActiveTab('settings')}
+            />
+          </View>
+        </View>
+
+        {isLoading ? (
+          <View style={styles.loadingState}>
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={styles.loadingText}>正在读取本地数据…</Text>
+          </View>
+        ) : activeTab === 'home' ? (
+          <HomeScreen
+            onOpenHistory={(habitId) => {
+              setSelectedHabitId(habitId);
+              setActiveTab('history');
+            }}
+          />
+        ) : activeTab === 'history' ? (
+          <HistoryScreen />
+        ) : (
+          <SettingsScreen />
+        )}
+      </View>
+    </SafeAreaView>
+  );
+
+  function TabButton({
+    label,
+    isActive,
+    onPress,
+  }: {
+    label: string;
+    isActive: boolean;
+    onPress: () => void;
+  }) {
+    return (
+      <TouchableOpacity
+        accessibilityRole="button"
+        onPress={onPress}
+        style={[styles.tabButton, isActive && styles.tabButtonActive]}
+      >
+        <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>{label}</Text>
+      </TouchableOpacity>
+    );
+  }
+}
 
 export default function App() {
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <HabitProvider>
+      <AppShell />
+    </HabitProvider>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
+  return StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    app: {
+      flex: 1,
+      backgroundColor: theme.colors.background,
+    },
+    header: {
+      paddingHorizontal: 20,
+      paddingTop: 18,
+      paddingBottom: 14,
+      backgroundColor: theme.colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      gap: 16,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '700',
+      color: theme.colors.textPrimary,
+    },
+    subtitle: {
+      marginTop: 6,
+      fontSize: 13,
+      color: theme.colors.textSecondary,
+    },
+    tabBar: {
+      flexDirection: 'row',
+      alignSelf: 'flex-start',
+      padding: 4,
+      borderRadius: 16,
+      backgroundColor: theme.colors.surfaceMuted,
+      gap: 6,
+    },
+    tabButton: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+    },
+    tabButtonActive: {
+      backgroundColor: theme.colors.primary,
+    },
+    tabButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.colors.textSecondary,
+    },
+    tabButtonTextActive: {
+      color: theme.colors.white,
+    },
+    loadingState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+    },
+    loadingText: {
+      fontSize: 14,
+      color: theme.colors.textSecondary,
+    },
+  });
+}

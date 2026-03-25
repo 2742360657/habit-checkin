@@ -8,49 +8,63 @@ import { getTodayCount } from '../utils/habit';
 type HabitCardProps = {
   habit: Habit;
   onAddCheckin: (habitId: string) => void;
+  onOpenDetails: (habitId: string) => void;
   onLongPress: (habit: Habit) => void;
 };
 
-export function HabitCard({ habit, onAddCheckin, onLongPress }: HabitCardProps) {
+export function HabitCard({
+  habit,
+  onAddCheckin,
+  onOpenDetails,
+  onLongPress,
+}: HabitCardProps) {
   const { theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const todayCount = getTodayCount(habit);
 
   return (
-    <Pressable onLongPress={() => onLongPress(habit)} delayLongPress={240} style={styles.card}>
-      <View style={styles.main}>
+    <View style={styles.card}>
+      <Pressable
+        style={styles.infoPressable}
+        onPress={() => onOpenDetails(habit.id)}
+        onLongPress={() => onLongPress(habit)}
+        delayLongPress={240}
+      >
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>
             {habit.name}
           </Text>
           <Text style={styles.countText}>今日 {todayCount} 次</Text>
         </View>
-        <TouchableOpacity onPress={() => onAddCheckin(habit.id)} style={styles.plusButton}>
-          <Text style={styles.plusText}>+1</Text>
-        </TouchableOpacity>
-      </View>
-    </Pressable>
+      </Pressable>
+
+      <TouchableOpacity onPress={() => onAddCheckin(habit.id)} style={styles.plusButton}>
+        <Text style={styles.plusText}>+1</Text>
+      </TouchableOpacity>
+    </View>
   );
 }
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
     card: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
       borderRadius: theme.radius.medium,
       paddingHorizontal: 14,
-      paddingVertical: 12,
+      paddingVertical: 10,
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
-    main: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      gap: 12,
+    infoPressable: {
+      flex: 1,
+      borderRadius: 12,
+      justifyContent: 'center',
+      minHeight: 48,
     },
     info: {
-      flex: 1,
       gap: 4,
     },
     name: {

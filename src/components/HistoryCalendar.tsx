@@ -71,6 +71,7 @@ export function HistoryCalendar({
           </Text>
         ))}
       </View>
+
       <View style={styles.grid}>
         {cells.map((cell) => {
           if (cell.day === null) {
@@ -82,40 +83,40 @@ export function HistoryCalendar({
           const isPressable = canPressDay?.(cell.key) ?? false;
 
           return (
-            <TouchableOpacity
-              key={cell.key}
-              disabled={!isPressable || !onPressDay}
-              onPress={() => onPressDay?.(cell.key)}
-              style={[
-                styles.cell,
-                compact && styles.cellCompact,
-                isActive ? styles.activeCell : styles.idleCell,
-                isPressable && styles.pressableCell,
-                isSelected && styles.selectedCell,
-              ]}
-            >
-              <Text
+            <View key={cell.key} style={[styles.cell, compact && styles.cellCompact]}>
+              <TouchableOpacity
+                disabled={!isPressable || !onPressDay}
+                onPress={() => onPressDay?.(cell.key)}
                 style={[
-                  styles.dayText,
-                  compact && styles.dayTextCompact,
-                  isActive && styles.activeDayText,
-                  isSelected && styles.selectedText,
+                  styles.dayChip,
+                  compact && styles.dayChipCompact,
+                  isActive && styles.activeChip,
+                  isSelected && styles.selectedChip,
                 ]}
               >
-                {cell.day}
-              </Text>
-              <Text
-                style={[
-                  styles.countText,
-                  compact && styles.countTextCompact,
-                  isActive && styles.activeCountText,
-                  isSelected && styles.selectedText,
-                ]}
-                numberOfLines={1}
-              >
-                {cell.count > 0 ? `${cell.count}次` : ''}
-              </Text>
-            </TouchableOpacity>
+                <Text
+                  style={[
+                    styles.dayText,
+                    compact && styles.dayTextCompact,
+                    isActive && styles.activeDayText,
+                    isSelected && styles.selectedText,
+                  ]}
+                >
+                  {cell.day}
+                </Text>
+                <Text
+                  style={[
+                    styles.countText,
+                    compact && styles.countTextCompact,
+                    isActive && styles.activeCountText,
+                    isSelected && styles.selectedText,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {cell.count > 0 ? `${cell.count}次` : ''}
+                </Text>
+              </TouchableOpacity>
+            </View>
           );
         })}
       </View>
@@ -130,6 +131,7 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     },
     weekdayRow: {
       flexDirection: 'row',
+      marginBottom: 2,
     },
     weekdayLabel: {
       flex: 1,
@@ -144,40 +146,42 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     grid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      borderRadius: theme.radius.small,
-      overflow: 'hidden',
+      marginHorizontal: -2,
+      marginVertical: -2,
     },
     cell: {
       width: '14.2857%',
+      paddingHorizontal: 2,
+      paddingVertical: 2,
+    },
+    cellCompact: {
+      paddingHorizontal: 1.5,
+      paddingVertical: 1.5,
+    },
+    dayChip: {
       minHeight: 58,
+      borderRadius: 18,
       paddingVertical: 8,
       paddingHorizontal: 4,
       alignItems: 'center',
       justifyContent: 'space-between',
-      borderWidth: 0.5,
-      borderColor: theme.colors.background,
+      backgroundColor: 'transparent',
     },
-    cellCompact: {
+    dayChipCompact: {
       minHeight: 42,
+      borderRadius: 14,
       paddingVertical: 6,
     },
-    idleCell: {
-      backgroundColor: theme.colors.surfaceMuted,
-    },
-    activeCell: {
+    activeChip: {
       backgroundColor: theme.colors.primarySoft,
     },
-    pressableCell: {
-      borderColor: theme.colors.border,
-    },
-    selectedCell: {
+    selectedChip: {
       backgroundColor: theme.colors.primary,
-      borderColor: theme.colors.primary,
     },
     dayText: {
       fontSize: 14,
       fontWeight: '700',
-      color: theme.colors.textPrimary,
+      color: theme.colors.textSecondary,
     },
     dayTextCompact: {
       fontSize: 11,
@@ -186,10 +190,12 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       color: theme.colors.primary,
     },
     countText: {
+      minHeight: 12,
       fontSize: 10,
-      color: theme.colors.textSecondary,
+      color: theme.colors.textMuted,
     },
     countTextCompact: {
+      minHeight: 10,
       fontSize: 8,
     },
     activeCountText: {

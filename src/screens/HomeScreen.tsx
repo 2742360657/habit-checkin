@@ -9,12 +9,14 @@ import {
 } from 'react-native';
 
 import { AddHabitModal } from '../components/AddHabitModal';
+import { CheckinDetailModal } from '../components/CheckinDetailModal';
 import { HabitActionModal } from '../components/HabitActionModal';
 import { HabitCard } from '../components/HabitCard';
 import { HabitHistoryModal } from '../components/HabitHistoryModal';
 import { TextEntryModal } from '../components/TextEntryModal';
 import { useHabits } from '../state/HabitStore';
 import { Habit } from '../types/habit';
+import { getTodayKey } from '../utils/date';
 
 type HabitSection = {
   id: string;
@@ -30,6 +32,7 @@ export function HomeScreen() {
   const [isAddGroupVisible, setAddGroupVisible] = useState(false);
   const [actionHabit, setActionHabit] = useState<Habit | null>(null);
   const [historyHabitId, setHistoryHabitId] = useState<string | null>(null);
+  const [todayDetailHabitId, setTodayDetailHabitId] = useState<string | null>(null);
 
   const sections = useMemo<HabitSection[]>(() => {
     const sortedHabits = [...habits].sort((left, right) => right.createdAt - left.createdAt);
@@ -91,7 +94,10 @@ export function HomeScreen() {
             </View>
           </View>
           <View style={styles.heroActions}>
-            <TouchableOpacity onPress={() => setAddGroupVisible(true)} style={styles.secondaryAction}>
+            <TouchableOpacity
+              onPress={() => setAddGroupVisible(true)}
+              style={styles.secondaryAction}
+            >
               <Text style={styles.secondaryActionText}>新增分组</Text>
             </TouchableOpacity>
             <TouchableOpacity onPress={() => setAddHabitVisible(true)} style={styles.primaryAction}>
@@ -102,13 +108,15 @@ export function HomeScreen() {
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>按分组打卡</Text>
-          <Text style={styles.sectionMeta}>长按习惯可打开设置、归档和历史入口</Text>
+          <Text style={styles.sectionMeta}>点击习惯打开今天详情，长按打开设置和历史入口</Text>
         </View>
 
         {sections.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>还没有习惯</Text>
-            <Text style={styles.emptyDescription}>先创建分组或习惯，打卡页会按分组整理展示。</Text>
+            <Text style={styles.emptyDescription}>
+              先创建分组或习惯，打卡页会按分组整理展示。
+            </Text>
           </View>
         ) : (
           sections.map((section) => {
@@ -136,6 +144,7 @@ export function HomeScreen() {
                           key={habit.id}
                           habit={habit}
                           onAddCheckin={addCheckinNow}
+                          onOpenDetails={setTodayDetailHabitId}
                           onLongPress={setActionHabit}
                         />
                       ))
@@ -168,6 +177,12 @@ export function HomeScreen() {
         habitId={historyHabitId}
         visible={historyHabitId !== null}
         onClose={() => setHistoryHabitId(null)}
+      />
+      <CheckinDetailModal
+        habitId={todayDetailHabitId}
+        dateKey={todayDetailHabitId ? getTodayKey() : null}
+        visible={todayDetailHabitId !== null}
+        onClose={() => setTodayDetailHabitId(null)}
       />
     </>
   );

@@ -41,7 +41,7 @@ export function EditHomeCopyModal({ visible, onClose }: EditHomeCopyModalProps) 
       <View style={styles.overlay}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.card}>
-          <Text style={styles.title}>修改首页说明文案</Text>
+          <Text style={styles.title}>修改打卡页说明文案</Text>
           <Text style={styles.description}>保持简短直接即可，保存后会长期保留。</Text>
 
           <View style={styles.field}>

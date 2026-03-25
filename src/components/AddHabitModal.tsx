@@ -43,7 +43,7 @@ export function AddHabitModal({ visible, onClose }: AddHabitModalProps) {
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.card}>
           <Text style={styles.title}>新建习惯</Text>
-          <Text style={styles.description}>输入习惯名称，并可直接选择所属分组。</Text>
+          <Text style={styles.description}>输入习惯名称，并为它选择一个分组。</Text>
           <TextInput
             autoFocus
             maxLength={24}
@@ -56,7 +56,11 @@ export function AddHabitModal({ visible, onClose }: AddHabitModalProps) {
 
           <View style={styles.groupSection}>
             <Text style={styles.groupTitle}>所属分组</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.groupList}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.groupList}
+            >
               <GroupOption
                 label="未分组"
                 selected={selectedGroupId === null}
@@ -155,7 +159,7 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       gap: 10,
     },
     groupChip: {
-      borderRadius: 12,
+      borderRadius: theme.radius.pill,
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surfaceMuted,

@@ -7,21 +7,87 @@ import {
   AppBackupFile,
   AppData,
   AppSettings,
+  CheckinRecord,
   Habit,
   HabitGroup,
-  LegacyHabitDataFile,
+  LegacyV1HabitDataFile,
+  LegacyV2AppDataFile,
+  LegacyV3AppDataFile,
+  LegacyV3CheckinRecord,
 } from '../types/habit';
+import { buildFallbackTimestamp, clampToMinute, toLocalDateKey } from '../utils/date';
+import { createId } from '../utils/id';
 
 const DATA_DIRECTORY = `${FileSystem.documentDirectory}habit-checkin/`;
 const DATA_FILE = `${DATA_DIRECTORY}data.json`;
 const BACKUP_FILE_PREFIX = 'habit-checkin-backup';
 
-export const DEFAULT_HOME_HERO_TITLE = '今天只看次数，记录保留真实时间';
+export const DEFAULT_HOME_HERO_TITLE = '今天只管打卡，记录会留在习惯里';
 export const DEFAULT_HOME_HERO_DESCRIPTION =
-  '+1 会新增当前本地时间的真实记录，-1 只删除今天最近一次打卡。';
+  '点击右侧 +1 会新增当前本地时间的真实记录，更多编辑统一放到习惯详情里处理。';
 
 function isThemeId(value: unknown): value is ThemeId {
   return typeof value === 'string' && value in THEME_PRESETS;
+}
+
+function migrateTimestampToRecord(timestamp: number): CheckinRecord {
+  return {
+    id: createId(),
+    dateKey: toLocalDateKey(timestamp),
+    timestamp,
+    note: '',
+    createdAt: timestamp,
+  };
+}
+
+function migrateLegacyRecord(record: LegacyV3CheckinRecord): CheckinRecord {
+  const timestamp =
+    typeof record.timestamp === 'number' ? record.timestamp : buildFallbackTimestamp(record.dateKey);
+
+  return {
+    id: record.id,
+    dateKey: record.dateKey,
+    timestamp,
+    note: '',
+    createdAt: record.createdAt,
+  };
+}
+
+function sanitizeCheckinRecord(candidate: unknown): CheckinRecord | null {
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+
+  const raw = candidate as Partial<CheckinRecord> & Partial<LegacyV3CheckinRecord>;
+  if (
+    typeof raw.id !== 'string' ||
+    typeof raw.dateKey !== 'string' ||
+    typeof raw.createdAt !== 'number'
+  ) {
+    return null;
+  }
+
+  if (typeof raw.timestamp === 'number') {
+    return {
+      id: raw.id,
+      dateKey: raw.dateKey,
+      timestamp: raw.timestamp,
+      note: typeof raw.note === 'string' ? raw.note : '',
+      createdAt: raw.createdAt,
+    };
+  }
+
+  if (typeof raw.hasTime === 'boolean') {
+    return migrateLegacyRecord({
+      id: raw.id,
+      dateKey: raw.dateKey,
+      hasTime: raw.hasTime,
+      timestamp: raw.timestamp ?? null,
+      createdAt: raw.createdAt,
+    });
+  }
+
+  return null;
 }
 
 function sanitizeHabitGroup(candidate: unknown): HabitGroup | null {
@@ -50,7 +116,11 @@ function sanitizeHabit(candidate: unknown): Habit | null {
     return null;
   }
 
-  const raw = candidate as Partial<Habit>;
+  const raw = candidate as Partial<Habit> & {
+    hiddenAt?: unknown;
+    archivedAt?: unknown;
+    checkins?: unknown;
+  };
   if (
     typeof raw.id !== 'string' ||
     typeof raw.name !== 'string' ||
@@ -60,13 +130,33 @@ function sanitizeHabit(candidate: unknown): Habit | null {
     return null;
   }
 
+  const normalizedCheckins = raw.checkins
+    .map((item) => {
+      if (typeof item === 'number') {
+        return migrateTimestampToRecord(item);
+      }
+      return sanitizeCheckinRecord(item);
+    })
+    .filter((record): record is CheckinRecord => record !== null)
+    .map((record) => ({
+      ...record,
+      dateKey: toLocalDateKey(record.timestamp),
+      timestamp: clampToMinute(record.timestamp),
+      note: record.note.trim(),
+    }));
+
   return {
     id: raw.id,
     name: raw.name.trim(),
     groupId: typeof raw.groupId === 'string' ? raw.groupId : null,
     createdAt: raw.createdAt,
-    hiddenAt: typeof raw.hiddenAt === 'number' ? raw.hiddenAt : null,
-    checkins: raw.checkins.filter((value): value is number => typeof value === 'number'),
+    archivedAt:
+      typeof raw.archivedAt === 'number'
+        ? raw.archivedAt
+        : typeof raw.hiddenAt === 'number'
+          ? raw.hiddenAt
+          : null,
+    checkins: normalizedCheckins,
   };
 }
 
@@ -88,7 +178,7 @@ function sanitizeSettings(candidate: unknown): AppSettings {
 
 function buildDefaultAppData(): AppData {
   return {
-    version: 2,
+    version: 4,
     habits: [],
     groups: [],
     settings: sanitizeSettings(null),
@@ -122,19 +212,19 @@ function normalizeAppData(candidate: unknown): AppData {
     : [];
 
   return {
-    version: 2,
+    version: 4,
     habits,
     groups,
     settings: sanitizeSettings(raw.settings),
   };
 }
 
-function migrateLegacyData(candidate: unknown): AppData {
+function migrateLegacyV1Data(candidate: unknown): AppData {
   if (!candidate || typeof candidate !== 'object') {
     throw new Error('旧版数据格式无效。');
   }
 
-  const raw = candidate as LegacyHabitDataFile;
+  const raw = candidate as LegacyV1HabitDataFile;
   if (raw.version !== 1 || !Array.isArray(raw.habits)) {
     throw new Error('旧版数据格式无效。');
   }
@@ -144,18 +234,54 @@ function migrateLegacyData(candidate: unknown): AppData {
       sanitizeHabit({
         ...habit,
         groupId: null,
-        hiddenAt: null,
+        archivedAt: null,
       })
     )
     .filter((habit): habit is Habit => habit !== null)
     .sort((left, right) => left.createdAt - right.createdAt);
 
   return {
-    version: 2,
+    version: 4,
     habits,
     groups: [],
     settings: sanitizeSettings(null),
   };
+}
+
+function migrateLegacyV2Data(candidate: unknown): AppData {
+  if (!candidate || typeof candidate !== 'object') {
+    throw new Error('旧版数据格式无效。');
+  }
+
+  const raw = candidate as LegacyV2AppDataFile;
+  if (raw.version !== 2) {
+    throw new Error('旧版数据格式无效。');
+  }
+
+  return normalizeAppData({
+    ...raw,
+    version: 4,
+    habits: raw.habits.map((habit) => ({
+      ...habit,
+      archivedAt: habit.hiddenAt ?? null,
+    })),
+  });
+}
+
+function migrateLegacyV3Data(candidate: unknown): AppData {
+  if (!candidate || typeof candidate !== 'object') {
+    throw new Error('旧版数据格式无效。');
+  }
+
+  const raw = candidate as LegacyV3AppDataFile;
+  if (raw.version !== 3) {
+    throw new Error('旧版数据格式无效。');
+  }
+
+  return normalizeAppData({
+    ...raw,
+    version: 4,
+  });
 }
 
 export function coerceAppData(candidate: unknown): AppData {
@@ -164,11 +290,17 @@ export function coerceAppData(candidate: unknown): AppData {
   }
 
   const raw = candidate as { version?: unknown };
-  if (raw.version === 2) {
+  if (raw.version === 4) {
     return normalizeAppData(candidate);
   }
+  if (raw.version === 3) {
+    return migrateLegacyV3Data(candidate);
+  }
+  if (raw.version === 2) {
+    return migrateLegacyV2Data(candidate);
+  }
   if (raw.version === 1) {
-    return migrateLegacyData(candidate);
+    return migrateLegacyV1Data(candidate);
   }
 
   throw new Error('不支持的数据版本。');
@@ -246,8 +378,4 @@ export async function importBackupFile(fileUri: string): Promise<AppData> {
 
 export function getGroupUsageCount(habits: Habit[], groupId: string) {
   return habits.filter((habit) => habit.groupId === groupId).length;
-}
-
-export function getHabitDataFilePath() {
-  return DATA_FILE;
 }

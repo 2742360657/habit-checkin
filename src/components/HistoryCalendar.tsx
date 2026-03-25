@@ -10,7 +10,8 @@ type HistoryCalendarProps = {
   dateCountMap: Record<string, number>;
   compact?: boolean;
   selectedDateKey?: string | null;
-  onPressDay?: (dateKey: string, count: number) => void;
+  canPressDay?: (dateKey: string) => boolean;
+  onPressDay?: (dateKey: string) => void;
 };
 
 type CalendarCell = {
@@ -54,6 +55,7 @@ export function HistoryCalendar({
   dateCountMap,
   compact = false,
   selectedDateKey = null,
+  canPressDay,
   onPressDay,
 }: HistoryCalendarProps) {
   const { theme } = useHabits();
@@ -77,16 +79,18 @@ export function HistoryCalendar({
 
           const isActive = cell.count > 0;
           const isSelected = selectedDateKey === cell.key;
+          const isPressable = canPressDay?.(cell.key) ?? false;
 
           return (
             <TouchableOpacity
               key={cell.key}
-              disabled={!isActive || !onPressDay}
-              onPress={() => onPressDay?.(cell.key, cell.count)}
+              disabled={!isPressable || !onPressDay}
+              onPress={() => onPressDay?.(cell.key)}
               style={[
                 styles.cell,
                 compact && styles.cellCompact,
                 isActive ? styles.activeCell : styles.idleCell,
+                isPressable && styles.pressableCell,
                 isSelected && styles.selectedCell,
               ]}
             >
@@ -163,8 +167,12 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     activeCell: {
       backgroundColor: theme.colors.primarySoft,
     },
+    pressableCell: {
+      borderColor: theme.colors.border,
+    },
     selectedCell: {
       backgroundColor: theme.colors.primary,
+      borderColor: theme.colors.primary,
     },
     dayText: {
       fontSize: 14,

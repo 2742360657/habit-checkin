@@ -37,7 +37,7 @@ export const THEME_PRESETS = {
   },
   amber: {
     id: 'amber',
-    label: '暖橙',
+    label: '暖棕',
     colors: {
       background: '#FAF6F0',
       surface: '#FFFFFF',
@@ -71,6 +71,24 @@ export const THEME_PRESETS = {
       white: '#FFFFFF',
     },
   },
+  mint: {
+    id: 'mint',
+    label: '薄荷',
+    colors: {
+      background: '#F2F8F6',
+      surface: '#FFFFFF',
+      surfaceMuted: '#E3F1ED',
+      border: '#CEE4DC',
+      primary: '#2C8A73',
+      primarySoft: '#D7F0E8',
+      danger: '#B84545',
+      dangerSoft: '#F8E6E6',
+      textPrimary: '#16231E',
+      textSecondary: '#5A756C',
+      textMuted: '#83958F',
+      white: '#FFFFFF',
+    },
+  },
   slate: {
     id: 'slate',
     label: '石墨',
@@ -97,6 +115,7 @@ export type AppTheme = (typeof THEME_PRESETS)[ThemeId] & {
     large: number;
     medium: number;
     small: number;
+    pill: number;
   };
   shadow: {
     shadowColor: string;
@@ -114,6 +133,7 @@ const SHARED_THEME_TOKENS = {
     large: 24,
     medium: 18,
     small: 12,
+    pill: 999,
   },
   shadow: {
     shadowColor: '#1F2E25',

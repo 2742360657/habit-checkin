@@ -16,14 +16,8 @@ export function formatTime(timestamp: number) {
   return new Intl.DateTimeFormat('zh-CN', {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false,
   }).format(new Date(timestamp));
-}
-
-export function formatEditableTime(timestamp: number) {
-  const date = new Date(timestamp);
-  return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 export function formatDateLabel(dateKey: string) {
@@ -47,44 +41,44 @@ export function getDaysInMonth(year: number, monthIndex: number) {
   return new Date(year, monthIndex + 1, 0).getDate();
 }
 
-export function shiftMonth(year: number, monthIndex: number, delta: number) {
-  const next = new Date(year, monthIndex + delta, 1);
-  return {
-    year: next.getFullYear(),
-    monthIndex: next.getMonth(),
-  };
-}
-
 export function getMonthStartWeekday(year: number, monthIndex: number) {
   return new Date(year, monthIndex, 1).getDay();
 }
 
-export function updateTimestampTime(dateKey: string, timeText: string) {
-  const match = timeText.trim().match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/);
-  if (!match) {
-    return null;
+export function compareDateKeys(left: string, right: string) {
+  if (left === right) {
+    return 0;
   }
 
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  const seconds = match[3] ? Number(match[3]) : 0;
+  return left < right ? -1 : 1;
+}
 
+export function isFutureDateKey(dateKey: string) {
+  return compareDateKeys(dateKey, getTodayKey()) > 0;
+}
+
+export function getHourMinuteFromTimestamp(timestamp: number) {
+  const date = new Date(timestamp);
+  return {
+    hour: date.getHours(),
+    minute: date.getMinutes(),
+  };
+}
+
+export function buildTimestampForDateTime(dateKey: string, hour: number, minute: number) {
   if (
-    Number.isNaN(hours) ||
-    Number.isNaN(minutes) ||
-    Number.isNaN(seconds) ||
-    hours < 0 ||
-    hours > 23 ||
-    minutes < 0 ||
-    minutes > 59 ||
-    seconds < 0 ||
-    seconds > 59
+    Number.isNaN(hour) ||
+    Number.isNaN(minute) ||
+    hour < 0 ||
+    hour > 23 ||
+    minute < 0 ||
+    minute > 59
   ) {
     return null;
   }
 
   const [year, month, day] = dateKey.split('-').map(Number);
-  const next = new Date(year, month - 1, day, hours, minutes, seconds, 0);
+  const next = new Date(year, month - 1, day, hour, minute, 0, 0);
 
   if (
     next.getFullYear() !== year ||
@@ -95,4 +89,14 @@ export function updateTimestampTime(dateKey: string, timeText: string) {
   }
 
   return next.getTime();
+}
+
+export function buildFallbackTimestamp(dateKey: string) {
+  return buildTimestampForDateTime(dateKey, 12, 0) ?? Date.now();
+}
+
+export function clampToMinute(timestamp: number) {
+  const date = new Date(timestamp);
+  date.setSeconds(0, 0);
+  return date.getTime();
 }

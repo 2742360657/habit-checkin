@@ -1,16 +1,20 @@
 import { useMemo, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import { AddHabitModal } from '../components/AddHabitModal';
-import { EditHomeCopyModal } from '../components/EditHomeCopyModal';
+import { HabitActionModal } from '../components/HabitActionModal';
 import { HabitCard } from '../components/HabitCard';
-import { TodayCheckinsModal } from '../components/TodayCheckinsModal';
+import { HabitHistoryModal } from '../components/HabitHistoryModal';
+import { TextEntryModal } from '../components/TextEntryModal';
 import { useHabits } from '../state/HabitStore';
 import { Habit } from '../types/habit';
-
-type HomeScreenProps = {
-  onOpenHistory: (habitId: string) => void;
-};
 
 type HabitSection = {
   id: string;
@@ -18,22 +22,14 @@ type HabitSection = {
   habits: Habit[];
 };
 
-export function HomeScreen({ onOpenHistory }: HomeScreenProps) {
-  const {
-    habits,
-    groups,
-    settings,
-    theme,
-    hideHabit,
-    deleteHabit,
-    addCheckin,
-    removeLatestTodayCheckin,
-  } = useHabits();
-
+export function HomeScreen() {
+  const { habits, groups, settings, theme, addCheckinNow, addGroup } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [isAddModalVisible, setAddModalVisible] = useState(false);
-  const [isCopyModalVisible, setCopyModalVisible] = useState(false);
-  const [todayHabit, setTodayHabit] = useState<Habit | null>(null);
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
+  const [isAddHabitVisible, setAddHabitVisible] = useState(false);
+  const [isAddGroupVisible, setAddGroupVisible] = useState(false);
+  const [actionHabit, setActionHabit] = useState<Habit | null>(null);
+  const [historyHabitId, setHistoryHabitId] = useState<string | null>(null);
 
   const sections = useMemo<HabitSection[]>(() => {
     const sortedHabits = [...habits].sort((left, right) => right.createdAt - left.createdAt);
@@ -52,15 +48,13 @@ export function HomeScreen({ onOpenHistory }: HomeScreenProps) {
       }
     }
 
-    const nextSections = groups
-      .map((group) => ({
-        id: group.id,
-        title: group.name,
-        habits: groupedHabits.get(group.id) ?? [],
-      }))
-      .filter((section) => section.habits.length > 0);
+    const nextSections = groups.map((group) => ({
+      id: group.id,
+      title: group.name,
+      habits: groupedHabits.get(group.id) ?? [],
+    }));
 
-    if (ungrouped.length > 0) {
+    if (ungrouped.length > 0 || groups.length === 0) {
       nextSections.push({
         id: 'ungrouped',
         title: '未分组',
@@ -71,37 +65,11 @@ export function HomeScreen({ onOpenHistory }: HomeScreenProps) {
     return nextSections;
   }, [groups, habits]);
 
-  const handleHideHabit = (habitId: string, habitName: string) => {
-    Alert.alert(
-      '隐藏习惯',
-      `隐藏“${habitName}”后，它会从首页和历史页移除，但不会删除数据，可在设置中恢复。`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '确认隐藏',
-          onPress: () => {
-            hideHabit(habitId);
-          },
-        },
-      ]
-    );
-  };
-
-  const handleDeleteHabit = (habitId: string, habitName: string) => {
-    Alert.alert(
-      '确认删除习惯',
-      `删除“${habitName}”后，相关全部打卡历史会一并清除，且无法恢复。`,
-      [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '确认删除',
-          style: 'destructive',
-          onPress: () => {
-            deleteHabit(habitId);
-          },
-        },
-      ]
-    );
+  const toggleSection = (sectionId: string) => {
+    setCollapsedSections((current) => ({
+      ...current,
+      [sectionId]: !current[sectionId],
+    }));
   };
 
   return (
@@ -117,57 +85,89 @@ export function HomeScreen({ onOpenHistory }: HomeScreenProps) {
               <Text style={styles.heroTitle}>{settings.homeHeroTitle}</Text>
               <Text style={styles.heroDescription}>{settings.homeHeroDescription}</Text>
             </View>
-            <View style={styles.heroActionRow}>
-              <TouchableOpacity onPress={() => setAddModalVisible(true)} style={styles.primaryButton}>
-                <Text style={styles.primaryButtonText}>新建习惯</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => setCopyModalVisible(true)} style={styles.secondaryButton}>
-                <Text style={styles.secondaryButtonText}>修改文案</Text>
-              </TouchableOpacity>
+            <View style={styles.heroStats}>
+              <Text style={styles.heroStatLabel}>当前活跃习惯</Text>
+              <Text style={styles.heroStatValue}>{habits.length}</Text>
             </View>
+          </View>
+          <View style={styles.heroActions}>
+            <TouchableOpacity onPress={() => setAddGroupVisible(true)} style={styles.secondaryAction}>
+              <Text style={styles.secondaryActionText}>新增分组</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setAddHabitVisible(true)} style={styles.primaryAction}>
+              <Text style={styles.primaryActionText}>新增习惯</Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>习惯列表</Text>
-          {sections.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyTitle}>还没有可显示的习惯</Text>
-              <Text style={styles.emptyDescription}>
-                先创建一个习惯，或者到设置页恢复已隐藏的习惯。
-              </Text>
-            </View>
-          ) : (
-            sections.map((section) => (
-              <View key={section.id} style={styles.groupSection}>
-                <Text style={styles.groupTitle}>{section.title}</Text>
-                <View style={styles.groupHabitList}>
-                  {section.habits.map((habit) => (
-                    <HabitCard
-                      key={habit.id}
-                      habit={habit}
-                      groupName={section.id === 'ungrouped' ? null : section.title}
-                      onAddCheckin={addCheckin}
-                      onRemoveCheckin={removeLatestTodayCheckin}
-                      onHideHabit={handleHideHabit}
-                      onDeleteHabit={handleDeleteHabit}
-                      onOpenToday={setTodayHabit}
-                      onOpenHistory={onOpenHistory}
-                    />
-                  ))}
-                </View>
-              </View>
-            ))
-          )}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>按分组打卡</Text>
+          <Text style={styles.sectionMeta}>长按习惯可打开设置、归档和历史入口</Text>
         </View>
+
+        {sections.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>还没有习惯</Text>
+            <Text style={styles.emptyDescription}>先创建分组或习惯，打卡页会按分组整理展示。</Text>
+          </View>
+        ) : (
+          sections.map((section) => {
+            const collapsed = collapsedSections[section.id] ?? false;
+
+            return (
+              <View key={section.id} style={styles.groupCard}>
+                <Pressable onPress={() => toggleSection(section.id)} style={styles.groupHeader}>
+                  <View style={styles.groupHeaderText}>
+                    <Text style={styles.groupTitle}>{section.title}</Text>
+                    <Text style={styles.groupMeta}>{section.habits.length} 个习惯</Text>
+                  </View>
+                  <Text style={styles.groupChevron}>{collapsed ? '展开' : '收起'}</Text>
+                </Pressable>
+
+                {!collapsed ? (
+                  <View style={styles.groupBody}>
+                    {section.habits.length === 0 ? (
+                      <View style={styles.groupEmpty}>
+                        <Text style={styles.groupEmptyText}>这个分组里还没有习惯</Text>
+                      </View>
+                    ) : (
+                      section.habits.map((habit) => (
+                        <HabitCard
+                          key={habit.id}
+                          habit={habit}
+                          onAddCheckin={addCheckinNow}
+                          onLongPress={setActionHabit}
+                        />
+                      ))
+                    )}
+                  </View>
+                ) : null}
+              </View>
+            );
+          })
+        )}
       </ScrollView>
 
-      <AddHabitModal visible={isAddModalVisible} onClose={() => setAddModalVisible(false)} />
-      <EditHomeCopyModal visible={isCopyModalVisible} onClose={() => setCopyModalVisible(false)} />
-      <TodayCheckinsModal
-        visible={todayHabit !== null}
-        habit={todayHabit}
-        onClose={() => setTodayHabit(null)}
+      <AddHabitModal visible={isAddHabitVisible} onClose={() => setAddHabitVisible(false)} />
+      <TextEntryModal
+        visible={isAddGroupVisible}
+        title="新建分组"
+        description="分组会作为打卡页的主要组织方式显示。"
+        placeholder="例如：晨间、运动、学习"
+        submitLabel="保存"
+        onClose={() => setAddGroupVisible(false)}
+        onSubmit={addGroup}
+      />
+      <HabitActionModal
+        habit={actionHabit}
+        visible={actionHabit !== null}
+        onClose={() => setActionHabit(null)}
+        onOpenHistory={(habitId) => setHistoryHabitId(habitId)}
+      />
+      <HabitHistoryModal
+        habitId={historyHabitId}
+        visible={historyHabitId !== null}
+        onClose={() => setHistoryHabitId(null)}
       />
     </>
   );
@@ -180,7 +180,7 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     },
     content: {
       padding: 20,
-      gap: 18,
+      gap: 14,
     },
     heroCard: {
       borderRadius: theme.radius.large,
@@ -188,12 +188,17 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       backgroundColor: theme.colors.primarySoft,
       borderWidth: 1,
       borderColor: theme.colors.border,
+      gap: 14,
     },
     heroHeader: {
-      gap: 16,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 12,
+      alignItems: 'flex-start',
     },
     heroText: {
-      gap: 8,
+      flex: 1,
+      gap: 6,
     },
     heroTitle: {
       fontSize: 22,
@@ -202,45 +207,70 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     },
     heroDescription: {
       fontSize: 14,
-      lineHeight: 22,
+      lineHeight: 21,
       color: theme.colors.textSecondary,
     },
-    heroActionRow: {
+    heroStats: {
+      minWidth: 92,
+      borderRadius: theme.radius.medium,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
+      gap: 4,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    heroStatLabel: {
+      fontSize: 11,
+      color: theme.colors.textSecondary,
+    },
+    heroStatValue: {
+      fontSize: 24,
+      fontWeight: '800',
+      color: theme.colors.primary,
+    },
+    heroActions: {
       flexDirection: 'row',
       gap: 10,
-      flexWrap: 'wrap',
     },
-    primaryButton: {
+    primaryAction: {
+      flex: 1,
       borderRadius: 14,
-      paddingHorizontal: 18,
       paddingVertical: 12,
+      alignItems: 'center',
       backgroundColor: theme.colors.primary,
     },
-    primaryButtonText: {
+    primaryActionText: {
       fontSize: 14,
       fontWeight: '700',
       color: theme.colors.white,
     },
-    secondaryButton: {
+    secondaryAction: {
+      flex: 1,
       borderRadius: 14,
-      paddingHorizontal: 18,
       paddingVertical: 12,
-      backgroundColor: theme.colors.surface,
+      alignItems: 'center',
       borderWidth: 1,
       borderColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
     },
-    secondaryButtonText: {
+    secondaryActionText: {
       fontSize: 14,
       fontWeight: '700',
       color: theme.colors.textSecondary,
     },
-    section: {
-      gap: 14,
+    sectionHeader: {
+      gap: 4,
     },
     sectionTitle: {
       fontSize: 18,
-      fontWeight: '700',
+      fontWeight: '800',
       color: theme.colors.textPrimary,
+    },
+    sectionMeta: {
+      fontSize: 12,
+      color: theme.colors.textSecondary,
     },
     emptyCard: {
       borderRadius: theme.radius.large,
@@ -260,16 +290,53 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       lineHeight: 20,
       color: theme.colors.textSecondary,
     },
-    groupSection: {
-      gap: 10,
+    groupCard: {
+      borderRadius: theme.radius.large,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+      overflow: 'hidden',
+    },
+    groupHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    groupHeaderText: {
+      flex: 1,
+      gap: 2,
     },
     groupTitle: {
-      fontSize: 15,
-      fontWeight: '700',
+      fontSize: 16,
+      fontWeight: '800',
+      color: theme.colors.textPrimary,
+    },
+    groupMeta: {
+      fontSize: 12,
       color: theme.colors.textSecondary,
     },
-    groupHabitList: {
-      gap: 12,
+    groupChevron: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.colors.primary,
+    },
+    groupBody: {
+      padding: 12,
+      gap: 10,
+    },
+    groupEmpty: {
+      borderRadius: theme.radius.medium,
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      backgroundColor: theme.colors.background,
+    },
+    groupEmptyText: {
+      fontSize: 13,
+      color: theme.colors.textSecondary,
     },
   });
 }

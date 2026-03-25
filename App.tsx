@@ -10,17 +10,16 @@ import {
   View,
 } from 'react-native';
 
-import { HistoryScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { HabitProvider, useHabits } from './src/state/HabitStore';
 
-type AppTab = 'home' | 'history' | 'settings';
+type AppTab = 'checkin' | 'settings';
 
 function AppShell() {
-  const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const [activeTab, setActiveTab] = useState<AppTab>('checkin');
   const hasShownErrorRef = useRef<string | null>(null);
-  const { isLoading, error, clearError, theme, selectedHabitId, setSelectedHabitId } = useHabits();
+  const { isLoading, error, clearError, theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
   useEffect(() => {
@@ -46,19 +45,14 @@ function AppShell() {
       <View style={styles.app}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.title}>习惯打卡</Text>
-            <Text style={styles.subtitle}>本地存储 · 简洁工具型 Android MVP</Text>
+            <Text style={styles.title}>打卡喵</Text>
+            <Text style={styles.subtitle}>本地打卡 · 分组整理 · 可备份恢复</Text>
           </View>
           <View style={styles.tabBar}>
             <TabButton
-              label="习惯"
-              isActive={activeTab === 'home'}
-              onPress={() => setActiveTab('home')}
-            />
-            <TabButton
-              label="历史"
-              isActive={activeTab === 'history'}
-              onPress={() => setActiveTab('history')}
+              label="打卡"
+              isActive={activeTab === 'checkin'}
+              onPress={() => setActiveTab('checkin')}
             />
             <TabButton
               label="设置"
@@ -71,17 +65,10 @@ function AppShell() {
         {isLoading ? (
           <View style={styles.loadingState}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={styles.loadingText}>正在读取本地数据…</Text>
+            <Text style={styles.loadingText}>正在读取本地数据...</Text>
           </View>
-        ) : activeTab === 'home' ? (
-          <HomeScreen
-            onOpenHistory={(habitId) => {
-              setSelectedHabitId(habitId);
-              setActiveTab('history');
-            }}
-          />
-        ) : activeTab === 'history' ? (
-          <HistoryScreen />
+        ) : activeTab === 'checkin' ? (
+          <HomeScreen />
         ) : (
           <SettingsScreen />
         )}
@@ -157,7 +144,7 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     },
     tabButton: {
       paddingVertical: 10,
-      paddingHorizontal: 16,
+      paddingHorizontal: 18,
       borderRadius: 12,
     },
     tabButtonActive: {
@@ -165,7 +152,7 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     },
     tabButtonText: {
       fontSize: 14,
-      fontWeight: '600',
+      fontWeight: '700',
       color: theme.colors.textSecondary,
     },
     tabButtonTextActive: {

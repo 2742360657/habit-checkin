@@ -18,6 +18,7 @@ type TextEntryModalProps = {
   placeholder: string;
   submitLabel: string;
   initialValue?: string;
+  maxLength?: number;
   onClose: () => void;
   onSubmit: (value: string) => boolean;
 };
@@ -29,6 +30,7 @@ export function TextEntryModal({
   placeholder,
   submitLabel,
   initialValue = '',
+  maxLength = 24,
   onClose,
   onSubmit,
 }: TextEntryModalProps) {
@@ -58,7 +60,7 @@ export function TextEntryModal({
           <Text style={styles.description}>{description}</Text>
           <TextInput
             autoFocus
-            maxLength={24}
+            maxLength={maxLength}
             placeholder={placeholder}
             placeholderTextColor={theme.colors.textMuted}
             value={value}

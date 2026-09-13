@@ -11,7 +11,12 @@ import {
 } from 'react-native';
 
 import { useHabits } from '../state/HabitStore';
-import { buildFallbackTimestamp, buildTimestampForDateTime, getHourMinuteFromTimestamp } from '../utils/date';
+import {
+  buildFallbackTimestamp,
+  buildTimestampForDateTime,
+  getHourMinuteFromTimestamp,
+  parseFlexibleTimeInput,
+} from '../utils/date';
 
 type CheckinRecordEditorModalProps = {
   visible: boolean;
@@ -39,8 +44,7 @@ export function CheckinRecordEditorModal({
 }: CheckinRecordEditorModalProps) {
   const { theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [hour, setHour] = useState('08');
-  const [minute, setMinute] = useState('00');
+  const [time, setTime] = useState('08:00');
   const [note, setNote] = useState(initialNote);
 
   useEffect(() => {
@@ -49,21 +53,19 @@ export function CheckinRecordEditorModal({
     }
 
     const next = getInitialParts(dateKey, initialTimestamp);
-    setHour(String(next.hour).padStart(2, '0'));
-    setMinute(String(next.minute).padStart(2, '0'));
+    setTime(`${String(next.hour).padStart(2, '0')}:${String(next.minute).padStart(2, '0')}`);
     setNote(initialNote);
   }, [dateKey, initialNote, initialTimestamp, visible]);
 
   const handleSubmit = () => {
-    if (!/^\d{1,2}$/.test(hour) || !/^\d{1,2}$/.test(minute)) {
-      Alert.alert('时间格式有误', '请输入有效的小时和分钟。');
+    const normalized = parseFlexibleTimeInput(time);
+    if (!normalized) {
+      Alert.alert('没认出这个时间', '可以试试 8:30、830、下午3点或 3pm。');
       return;
     }
-    const timestamp = buildTimestampForDateTime(dateKey, Number(hour), Number(minute));
-    if (timestamp === null) {
-      Alert.alert('时间格式有误', '小时应为 0–23，分钟应为 0–59。');
-      return;
-    }
+    const [hour, minute] = normalized.split(':').map(Number);
+    const timestamp = buildTimestampForDateTime(dateKey, hour, minute);
+    if (timestamp === null) return;
 
     onSubmit(timestamp, note);
     onClose();
@@ -75,35 +77,32 @@ export function CheckinRecordEditorModal({
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.description}>直接输入时间，或使用下面的快捷分钟；备注可以为空。</Text>
-
-          <View style={styles.timePicker}>
-            <TimeField
-              title="小时"
-              value={hour}
-              onChange={setHour}
-            />
-            <Text style={styles.timeColon}>:</Text>
-            <TimeField
-              title="分钟"
-              value={minute}
-              onChange={setMinute}
-            />
-          </View>
+          <TextInput
+            autoFocus
+            maxLength={20}
+            value={time}
+            onChangeText={setTime}
+            onBlur={() => {
+              const normalized = parseFlexibleTimeInput(time);
+              if (normalized) setTime(normalized);
+            }}
+            placeholder="时间"
+            placeholderTextColor={theme.colors.textMuted}
+            style={styles.timeInput}
+          />
           <View style={styles.quickRow}>
             <TouchableOpacity
               onPress={() => {
                 const now = new Date();
-                setHour(String(now.getHours()).padStart(2, '0'));
-                setMinute(String(now.getMinutes()).padStart(2, '0'));
+                setTime(`${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`);
               }}
               style={styles.quickButton}
             >
               <Text style={styles.quickButtonText}>现在</Text>
             </TouchableOpacity>
-            {['00', '15', '30', '45'].map((value) => (
-              <TouchableOpacity key={value} onPress={() => setMinute(value)} style={styles.quickButton}>
-                <Text style={styles.quickButtonText}>:{value}</Text>
+            {['08:00', '12:00', '20:00'].map((value) => (
+              <TouchableOpacity key={value} onPress={() => setTime(value)} style={styles.quickButton}>
+                <Text style={styles.quickButtonText}>{value}</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -115,7 +114,7 @@ export function CheckinRecordEditorModal({
               maxLength={120}
               value={note}
               onChangeText={setNote}
-              placeholder="可选，例如：晚饭后、跑步机、状态一般"
+              placeholder="备注"
               placeholderTextColor={theme.colors.textMuted}
               style={styles.noteInput}
             />
@@ -133,30 +132,6 @@ export function CheckinRecordEditorModal({
       </View>
     </Modal>
   );
-
-  function TimeField({
-    title,
-    value,
-    onChange,
-  }: {
-    title: string;
-    value: string;
-    onChange: (value: string) => void;
-  }) {
-    return (
-      <View style={styles.timeField}>
-        <Text style={styles.timeColumnTitle}>{title}</Text>
-        <TextInput
-          keyboardType="number-pad"
-          maxLength={2}
-          selectTextOnFocus
-          value={value}
-          onChangeText={(next) => onChange(next.replace(/\D/g, ''))}
-          style={styles.timeInput}
-        />
-      </View>
-    );
-  }
 }
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
@@ -185,42 +160,16 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontWeight: '700',
       color: theme.colors.textPrimary,
     },
-    description: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
-    },
-    timePicker: {
-      flexDirection: 'row',
-      alignItems: 'flex-end',
-      justifyContent: 'center',
-      gap: 14,
-    },
-    timeField: {
-      width: 112,
-      gap: 8,
-    },
-    timeColumnTitle: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: theme.colors.textPrimary,
-    },
     timeInput: {
-      height: 68,
+      height: 64,
       borderRadius: 18,
       textAlign: 'center',
-      fontSize: 30,
+      fontSize: 24,
       fontWeight: '800',
       color: theme.colors.primary,
       backgroundColor: theme.colors.primarySoft,
       borderWidth: 1,
       borderColor: theme.colors.border,
-    },
-    timeColon: {
-      paddingBottom: 16,
-      fontSize: 30,
-      fontWeight: '800',
-      color: theme.colors.textSecondary,
     },
     quickRow: {
       flexDirection: 'row',

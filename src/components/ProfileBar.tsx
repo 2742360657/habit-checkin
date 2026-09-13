@@ -1,0 +1,73 @@
+import { useMemo } from 'react';
+import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+import { useHabits } from '../state/HabitStore';
+
+type ProfileBarProps = {
+  onPress: () => void;
+};
+
+export function ProfileBar({ onPress }: ProfileBarProps) {
+  const { settings, theme } = useHabits();
+  const styles = useMemo(() => createStyles(theme), [theme]);
+  const initial = settings.profileName.trim().slice(0, 1).toUpperCase() || '酸';
+
+  return (
+    <TouchableOpacity
+      accessibilityLabel="编辑个人资料"
+      activeOpacity={0.78}
+      onPress={onPress}
+      style={styles.bar}
+    >
+      {settings.avatarUri ? (
+        <Image source={{ uri: settings.avatarUri }} style={styles.avatar} />
+      ) : (
+        <View style={[styles.avatar, styles.avatarFallback]}>
+          <Text style={styles.avatarInitial}>{initial}</Text>
+        </View>
+      )}
+      <View style={styles.copy}>
+        <Text numberOfLines={1} style={styles.name}>{settings.profileName}</Text>
+        {settings.profileSignature ? (
+          <Text numberOfLines={1} style={styles.signature}>{settings.profileSignature}</Text>
+        ) : null}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
+  return StyleSheet.create({
+    bar: {
+      minHeight: 66,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
+    },
+    avatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: theme.colors.primarySoft,
+    },
+    avatarFallback: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: theme.colors.border,
+    },
+    avatarInitial: {
+      fontSize: 19,
+      fontWeight: '800',
+      color: theme.colors.primary,
+    },
+    copy: { flex: 1, gap: 3 },
+    name: { fontSize: 16, fontWeight: '800', color: theme.colors.textPrimary },
+    signature: { fontSize: 11, color: theme.colors.textSecondary },
+  });
+}

@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
+  StatusBar as NativeStatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -12,8 +14,13 @@ import {
 } from 'react-native';
 
 import { TodoInput, useHabits } from '../state/HabitStore';
-import { TodoItem, TodoPriority } from '../types/habit';
-import { addDaysToDateKey, getTodayKey, isValidDateKey } from '../utils/date';
+import { TodoItem } from '../types/habit';
+import {
+  addDaysToDateKey,
+  getTodayKey,
+  parseFlexibleDateInput,
+  parseFlexibleTimeInput,
+} from '../utils/date';
 
 type DueMode = 'none' | 'today' | 'tomorrow' | 'custom';
 
@@ -31,7 +38,6 @@ export function TodoEditorModal({ visible, todo = null, onClose }: TodoEditorMod
   const [dueMode, setDueMode] = useState<DueMode>('none');
   const [customDate, setCustomDate] = useState(getTodayKey());
   const [dueTime, setDueTime] = useState('');
-  const [priority, setPriority] = useState<TodoPriority>('normal');
 
   useEffect(() => {
     if (!visible) {
@@ -44,7 +50,6 @@ export function TodoEditorModal({ visible, todo = null, onClose }: TodoEditorMod
     setNote(todo?.note ?? '');
     setCustomDate(todo?.dueDateKey ?? todayKey);
     setDueTime(todo?.dueTime ?? '');
-    setPriority(todo?.priority ?? 'normal');
     setDueMode(
       !todo?.dueDateKey
         ? 'none'
@@ -58,21 +63,22 @@ export function TodoEditorModal({ visible, todo = null, onClose }: TodoEditorMod
 
   const handleSubmit = () => {
     const todayKey = getTodayKey();
-    const dueDateKey =
-      dueMode === 'none'
-        ? null
-        : dueMode === 'today'
-          ? todayKey
-          : dueMode === 'tomorrow'
-            ? addDaysToDateKey(todayKey, 1)
-            : customDate.trim();
-
-    if (dueDateKey && !isValidDateKey(dueDateKey)) {
-      Alert.alert('日期格式有误', '请按 YYYY-MM-DD 输入，例如 2026-09-13。');
-      return;
+    let dueDateKey: string | null = null;
+    if (dueMode === 'today') {
+      dueDateKey = todayKey;
+    } else if (dueMode === 'tomorrow') {
+      dueDateKey = addDaysToDateKey(todayKey, 1);
+    } else if (dueMode === 'custom') {
+      dueDateKey = parseFlexibleDateInput(customDate);
+      if (!dueDateKey) {
+        Alert.alert('没认出这个日期', '可以试试 6.9、6-9、6 9、明天或 Jun 9。');
+        return;
+      }
     }
-    if (dueTime.trim() && !/^([01]\d|2[0-3]):[0-5]\d$/.test(dueTime.trim())) {
-      Alert.alert('时间格式有误', '请按 HH:MM 输入，例如 18:30。');
+
+    const normalizedTime = dueTime.trim() ? parseFlexibleTimeInput(dueTime) : null;
+    if (dueDateKey && dueTime.trim() && !normalizedTime) {
+      Alert.alert('没认出这个时间', '可以试试 8:30、830、下午3点或 3pm。');
       return;
     }
 
@@ -80,8 +86,7 @@ export function TodoEditorModal({ visible, todo = null, onClose }: TodoEditorMod
       title,
       note,
       dueDateKey,
-      dueTime: dueDateKey && dueTime.trim() ? dueTime.trim() : null,
-      priority,
+      dueTime: dueDateKey ? normalizedTime : null,
     };
     const success = todo ? updateTodo(todo.id, input) : addTodo(input);
     if (success) {
@@ -125,7 +130,7 @@ export function TodoEditorModal({ visible, todo = null, onClose }: TodoEditorMod
             <TextInput
               autoFocus
               maxLength={80}
-              placeholder="例如：提交报销材料"
+              placeholder="待办名称"
               placeholderTextColor={theme.colors.textMuted}
               value={title}
               onChangeText={setTitle}
@@ -145,36 +150,34 @@ export function TodoEditorModal({ visible, todo = null, onClose }: TodoEditorMod
               <TextInput
                 value={customDate}
                 onChangeText={setCustomDate}
-                maxLength={10}
-                placeholder="YYYY-MM-DD"
+                onBlur={() => {
+                  const normalized = parseFlexibleDateInput(customDate);
+                  if (normalized) setCustomDate(normalized);
+                }}
+                maxLength={30}
+                placeholder="日期"
                 placeholderTextColor={theme.colors.textMuted}
                 style={styles.input}
               />
             ) : null}
             {dueMode !== 'none' ? (
               <View style={styles.timeRow}>
-                <View style={styles.timeCopy}>
-                  <Text style={styles.timeTitle}>具体时间（可选）</Text>
-                  <Text style={styles.hint}>留空时按当天结束前处理</Text>
-                </View>
+                <Text style={styles.timeTitle}>时间</Text>
                 <TextInput
                   value={dueTime}
                   onChangeText={setDueTime}
-                  maxLength={5}
-                  placeholder="18:30"
+                  onBlur={() => {
+                    if (!dueTime.trim()) return;
+                    const normalized = parseFlexibleTimeInput(dueTime);
+                    if (normalized) setDueTime(normalized);
+                  }}
+                  maxLength={20}
+                  placeholder="时间"
                   placeholderTextColor={theme.colors.textMuted}
                   style={styles.timeInput}
                 />
               </View>
             ) : null}
-          </View>
-
-          <View style={styles.field}>
-            <Text style={styles.label}>优先级</Text>
-            <View style={styles.chips}>
-              <Choice label="普通" active={priority === 'normal'} onPress={() => setPriority('normal')} />
-              <Choice label="重要" active={priority === 'high'} onPress={() => setPriority('high')} danger />
-            </View>
           </View>
 
           <View style={styles.field}>
@@ -184,7 +187,7 @@ export function TodoEditorModal({ visible, todo = null, onClose }: TodoEditorMod
               maxLength={300}
               value={note}
               onChangeText={setNote}
-              placeholder="补充说明、地址或下一步（可选）"
+              placeholder="备注"
               placeholderTextColor={theme.colors.textMuted}
               style={[styles.input, styles.noteInput]}
             />
@@ -204,19 +207,17 @@ export function TodoEditorModal({ visible, todo = null, onClose }: TodoEditorMod
     label,
     active,
     onPress,
-    danger = false,
   }: {
     label: string;
     active: boolean;
     onPress: () => void;
-    danger?: boolean;
   }) {
     return (
       <TouchableOpacity
         onPress={onPress}
-        style={[styles.chip, active && styles.chipActive, active && danger && styles.chipDanger]}
+        style={[styles.chip, active && styles.chipActive]}
       >
-        <Text style={[styles.chipText, active && styles.chipTextActive, active && danger && styles.chipTextDanger]}>
+        <Text style={[styles.chipText, active && styles.chipTextActive]}>
           {label}
         </Text>
       </TouchableOpacity>
@@ -226,7 +227,11 @@ export function TodoEditorModal({ visible, todo = null, onClose }: TodoEditorMod
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    safeArea: {
+      flex: 1,
+      paddingTop: Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 0 : 0,
+      backgroundColor: theme.colors.background,
+    },
     header: {
       minHeight: 64,
       paddingHorizontal: 16,
@@ -274,10 +279,8 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       backgroundColor: theme.colors.surface,
     },
     chipActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft },
-    chipDanger: { borderColor: theme.colors.danger, backgroundColor: theme.colors.dangerSoft },
     chipText: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary },
     chipTextActive: { color: theme.colors.primary },
-    chipTextDanger: { color: theme.colors.danger },
     timeRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -286,11 +289,9 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       borderRadius: 14,
       backgroundColor: theme.colors.surfaceMuted,
     },
-    timeCopy: { flex: 1, gap: 3 },
-    timeTitle: { fontSize: 14, fontWeight: '700', color: theme.colors.textPrimary },
-    hint: { fontSize: 11, color: theme.colors.textSecondary },
+    timeTitle: { flex: 1, fontSize: 14, fontWeight: '700', color: theme.colors.textPrimary },
     timeInput: {
-      width: 76,
+      width: 128,
       borderRadius: 10,
       paddingHorizontal: 10,
       paddingVertical: 9,

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useHabits } from '../state/HabitStore';
@@ -9,14 +9,16 @@ type TodoRowProps = {
   todo: TodoItem;
   onToggle: (todo: TodoItem) => void;
   onPress: (todo: TodoItem) => void;
+  onLongPress?: (todo: TodoItem) => void;
   compact?: boolean;
 };
 
-export function TodoRow({ todo, onToggle, onPress, compact = false }: TodoRowProps) {
+export function TodoRow({ todo, onToggle, onPress, onLongPress, compact = false }: TodoRowProps) {
   const { theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const completed = todo.completedAt !== null;
   const overdue = !completed && isTodoOverdue(todo);
+  const lastLongPress = useRef(0);
 
   return (
     <View style={[styles.row, compact && styles.rowCompact, completed && styles.rowCompleted]}>
@@ -27,13 +29,20 @@ export function TodoRow({ todo, onToggle, onPress, compact = false }: TodoRowPro
       >
         <Text style={[styles.checkText, completed && styles.checkTextDone]}>{completed ? '✓' : ''}</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => onPress(todo)} style={styles.content}>
-        <View style={styles.titleLine}>
-          <Text numberOfLines={1} style={[styles.title, completed && styles.titleDone]}>
-            {todo.title}
-          </Text>
-          {todo.priority === 'high' ? <Text style={styles.priority}>重要</Text> : null}
-        </View>
+      <TouchableOpacity
+        delayLongPress={360}
+        onLongPress={onLongPress ? () => {
+          lastLongPress.current = Date.now();
+          onLongPress(todo);
+        } : undefined}
+        onPress={() => {
+          if (Date.now() - lastLongPress.current > 700) onPress(todo);
+        }}
+        style={styles.content}
+      >
+        <Text numberOfLines={1} style={[styles.title, completed && styles.titleDone]}>
+          {todo.title}
+        </Text>
         <Text style={[styles.meta, overdue && styles.metaOverdue]}>{formatTodoDue(todo)}</Text>
       </TouchableOpacity>
       <TouchableOpacity accessibilityLabel="编辑待办" onPress={() => onPress(todo)} style={styles.more}>
@@ -89,11 +98,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       flex: 1,
       gap: 5,
     },
-    titleLine: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-    },
     title: {
       flexShrink: 1,
       fontSize: 15,
@@ -103,16 +107,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     titleDone: {
       textDecorationLine: 'line-through',
       color: theme.colors.textSecondary,
-    },
-    priority: {
-      borderRadius: 999,
-      paddingHorizontal: 7,
-      paddingVertical: 3,
-      overflow: 'hidden',
-      fontSize: 10,
-      fontWeight: '800',
-      color: theme.colors.danger,
-      backgroundColor: theme.colors.dangerSoft,
     },
     meta: {
       fontSize: 12,

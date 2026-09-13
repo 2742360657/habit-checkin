@@ -21,9 +21,6 @@ export function compareTodosSmart(left: TodoItem, right: TodoItem) {
   if (dueComparison !== 0) {
     return dueComparison;
   }
-  if (left.priority !== right.priority) {
-    return left.priority === 'high' ? -1 : 1;
-  }
   return left.order - right.order;
 }
 

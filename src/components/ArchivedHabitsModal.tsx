@@ -21,13 +21,11 @@ export function ArchivedHabitsModal({ visible, onClose }: ArchivedHabitsModalPro
           <Pressable style={styles.backdrop} onPress={onClose} />
           <View style={styles.card}>
             <Text style={styles.title}>归档习惯</Text>
-            <Text style={styles.description}>归档习惯不会出现在打卡页，但可以在这里只读查看；如有需要，也可以恢复。</Text>
 
             <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
               {archivedHabits.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyTitle}>没有归档习惯</Text>
-                  <Text style={styles.emptyDescription}>当你归档习惯后，会在这里看到它们。</Text>
                 </View>
               ) : (
                 archivedHabits.map((habit) => (
@@ -92,11 +90,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontWeight: '700',
       color: theme.colors.textPrimary,
     },
-    description: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
-    },
     list: {
       gap: 10,
     },
@@ -110,11 +103,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 15,
       fontWeight: '700',
       color: theme.colors.textPrimary,
-    },
-    emptyDescription: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
     },
     row: {
       borderRadius: theme.radius.medium,

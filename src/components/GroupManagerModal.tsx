@@ -55,16 +55,8 @@ export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) 
             <View style={styles.header}>
               <View style={styles.headerText}>
                 <Text style={styles.title}>分组管理</Text>
-                <Text style={styles.description}>这里集中管理分组；新增分组也可以直接在打卡页顶部完成。</Text>
               </View>
               <View style={styles.headerActions}>
-                <TouchableOpacity
-                  disabled={orderedGroups.length < 2}
-                  onPress={() => setReorderVisible(true)}
-                  style={[styles.secondaryHeaderButton, orderedGroups.length < 2 && styles.disabledButton]}
-                >
-                  <Text style={styles.secondaryHeaderButtonText}>排序</Text>
-                </TouchableOpacity>
                 <TouchableOpacity onPress={() => setAddingGroup(true)} style={styles.addButton}>
                   <Text style={styles.addButtonText}>新增</Text>
                 </TouchableOpacity>
@@ -75,15 +67,21 @@ export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) 
               {groups.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyTitle}>还没有分组</Text>
-                  <Text style={styles.emptyDescription}>可以创建几个常用分组，例如晨间、运动、学习。</Text>
                 </View>
               ) : (
                 orderedGroups.map((group) => (
                   <View key={group.id} style={styles.row}>
-                    <View style={styles.meta}>
+                    <TouchableOpacity
+                      delayLongPress={360}
+                      onLongPress={() => {
+                        if (orderedGroups.length > 1) setReorderVisible(true);
+                      }}
+                      onPress={() => setEditingGroup(group)}
+                      style={styles.meta}
+                    >
                       <Text style={styles.name}>{group.name}</Text>
                       <Text style={styles.usage}>{getGroupUsageCount(allHabits, group.id)} 个习惯</Text>
-                    </View>
+                    </TouchableOpacity>
                     <View style={styles.rowActions}>
                       <TouchableOpacity onPress={() => setEditingGroup(group)} style={styles.editButton}>
                         <Text style={styles.editButtonText}>重命名</Text>
@@ -110,8 +108,7 @@ export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) 
       <TextEntryModal
         visible={addingGroup}
         title="新建分组"
-        description="分组用于在打卡页归类展示习惯，名称保持简短清晰即可。"
-        placeholder="例如：晨间、运动、学习"
+        placeholder="分组名称"
         submitLabel="保存"
         onClose={() => setAddingGroup(false)}
         onSubmit={addGroup}
@@ -119,8 +116,7 @@ export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) 
       <TextEntryModal
         visible={editingGroup !== null}
         title="重命名分组"
-        description="修改后会立即更新习惯页中的分组标题。"
-        placeholder="输入新的分组名称"
+        placeholder="分组名称"
         submitLabel="保存"
         initialValue={editingGroup?.name ?? ''}
         onClose={() => setEditingGroup(null)}
@@ -128,7 +124,7 @@ export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) 
       />
       <ReorderModal
         visible={reorderVisible}
-        title="分组排序"
+        title="调整顺序"
         items={orderedGroups.map((group) => ({
           id: group.id,
           label: group.name,
@@ -177,11 +173,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontWeight: '700',
       color: theme.colors.textPrimary,
     },
-    description: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
-    },
     addButton: {
       borderRadius: 12,
       paddingHorizontal: 14,
@@ -197,18 +188,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       flexDirection: 'row',
       gap: 8,
     },
-    secondaryHeaderButton: {
-      borderRadius: 12,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      backgroundColor: theme.colors.surfaceMuted,
-    },
-    secondaryHeaderButtonText: {
-      fontSize: 13,
-      fontWeight: '700',
-      color: theme.colors.primary,
-    },
-    disabledButton: { opacity: 0.4 },
     list: {
       gap: 10,
     },
@@ -222,11 +201,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 15,
       fontWeight: '700',
       color: theme.colors.textPrimary,
-    },
-    emptyDescription: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
     },
     row: {
       borderRadius: theme.radius.medium,

@@ -46,7 +46,6 @@ export function TodayScreen({ onOpenTasks, onOpenHabits }: TodayScreenProps) {
       return leftGroup - rightGroup || left.order - right.order;
     });
   }, [groups, habits]);
-  const openTodoCount = todos.filter((todo) => todo.completedAt === null).length;
   const todayLabel = new Intl.DateTimeFormat('zh-CN', {
     month: 'long',
     day: 'numeric',
@@ -72,7 +71,6 @@ export function TodayScreen({ onOpenTasks, onOpenHabits }: TodayScreenProps) {
         <ScreenHeader
           eyebrow={todayLabel}
           title="今天"
-          description={openTodoCount > 0 ? `还有 ${openTodoCount} 项待办，按紧急程度从上到下处理。` : '今天没有未完成待办，按自己的节奏来。'}
           action={(
             <TouchableOpacity onPress={() => openEditor(null)} style={styles.addButton}>
               <Text style={styles.addButtonText}>＋ 待办</Text>
@@ -98,13 +96,12 @@ export function TodayScreen({ onOpenTasks, onOpenHabits }: TodayScreenProps) {
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>习惯</Text>
             <TouchableOpacity onPress={onOpenHabits}>
-              <Text style={styles.linkText}>管理顺序 ›</Text>
+              <Text style={styles.linkText}>查看全部 ›</Text>
             </TouchableOpacity>
           </View>
           {orderedHabits.length === 0 ? (
             <TouchableOpacity onPress={onOpenHabits} style={styles.emptyCard}>
               <Text style={styles.emptyTitle}>还没有习惯</Text>
-              <Text style={styles.emptyText}>创建每日、每周或每月目标。</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles.list}>
@@ -187,6 +184,5 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     list: { gap: 8 },
     emptyCard: { borderRadius: 18, padding: 16, gap: 5, backgroundColor: theme.colors.surface },
     emptyTitle: { fontSize: 15, fontWeight: '800', color: theme.colors.textPrimary },
-    emptyText: { fontSize: 12, color: theme.colors.textSecondary },
   });
 }

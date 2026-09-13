@@ -20,10 +20,12 @@ try {
   assert.equal(await page.getByText('设置', { exact: true }).count() > 0, true);
 
   await page.getByText('＋ 待办', { exact: true }).click();
-  await page.getByPlaceholder('例如：提交报销材料').fill('界面冒烟测试待办');
-  await page.getByText('今天', { exact: true }).last().click();
+  await page.getByPlaceholder('待办名称').fill('界面冒烟测试待办');
+  await page.getByText('自定义', { exact: true }).click();
+  await page.getByPlaceholder('日期').fill('6.9');
+  await page.getByPlaceholder('时间').fill('下午3点');
   await page.getByText('保存', { exact: true }).click();
-  await page.getByPlaceholder('例如：提交报销材料').waitFor({ state: 'hidden' });
+  await page.getByPlaceholder('待办名称').waitFor({ state: 'hidden' });
   await page.getByText('界面冒烟测试待办', { exact: true }).first().waitFor();
 
   await page.getByLabel('完成待办：界面冒烟测试待办').first().click();
@@ -32,13 +34,18 @@ try {
   await page.getByText('界面冒烟测试待办', { exact: true }).first().waitFor();
 
   await page.getByText('＋ 待办', { exact: true }).click();
-  await page.getByPlaceholder('例如：提交报销材料').fill('第二个无日期待办');
+  await page.getByPlaceholder('待办名称').fill('第二个无日期待办');
   await page.getByText('保存', { exact: true }).click();
-  await page.getByPlaceholder('例如：提交报销材料').waitFor({ state: 'hidden' });
+  await page.getByPlaceholder('待办名称').waitFor({ state: 'hidden' });
+
+  await page.getByText('＋ 待办', { exact: true }).click();
+  await page.getByPlaceholder('待办名称').fill('第三个无日期待办');
+  await page.getByText('保存', { exact: true }).click();
+  await page.getByPlaceholder('待办名称').waitFor({ state: 'hidden' });
 
   await page.getByText('习惯', { exact: true }).last().click();
   await page.getByText('＋ 习惯', { exact: true }).click();
-  await page.getByPlaceholder('例如：喝水、散步、背单词').fill('每周运动');
+  await page.getByPlaceholder('习惯名称').fill('每周运动');
   await page.getByText('每周', { exact: true }).click();
   await page.locator('input').nth(1).fill('3');
   await page.getByText('保存', { exact: true }).click();
@@ -47,17 +54,25 @@ try {
   await page.screenshot({ path: 'artifacts/smoke-habits.png', fullPage: true });
 
   await page.getByText('待办', { exact: true }).last().click();
-  await page.getByText('自定义', { exact: true }).click();
-  await page.getByText('界面冒烟测试待办', { exact: true }).nth(1).waitFor();
-  await page.getByText('拖动排序', { exact: true }).click();
-  await page.getByText('待办自定义排序', { exact: true }).waitFor();
-  await page.waitForTimeout(500);
-  const secondHandle = page.getByLabel('拖动 第二个无日期待办');
-  const secondBox = await secondHandle.boundingBox();
-  assert.ok(secondBox, 'Second reorder handle should be visible');
   const client = await context.newCDPSession(page);
-  const touchX = secondBox.x + secondBox.width / 2;
-  const touchY = secondBox.y + secondBox.height / 2;
+  const thirdTodoBox = await page.getByText('第三个无日期待办', { exact: true }).last().boundingBox();
+  assert.ok(thirdTodoBox, 'Third todo should be visible');
+  const longPressX = thirdTodoBox.x + thirdTodoBox.width / 2;
+  const longPressY = thirdTodoBox.y + thirdTodoBox.height / 2;
+  await client.send('Input.dispatchTouchEvent', {
+    type: 'touchStart',
+    touchPoints: [{ x: longPressX, y: longPressY, radiusX: 4, radiusY: 4, force: 1 }],
+  });
+  await page.waitForTimeout(450);
+  await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await page.getByText('调整顺序', { exact: true }).waitFor();
+  await page.waitForTimeout(300);
+
+  const thirdHandle = page.getByLabel('拖动 第三个无日期待办');
+  const thirdBox = await thirdHandle.boundingBox();
+  assert.ok(thirdBox, 'Third reorder handle should be visible');
+  const touchX = thirdBox.x + thirdBox.width / 2;
+  const touchY = thirdBox.y + thirdBox.height / 2;
   await client.send('Input.dispatchTouchEvent', {
     type: 'touchStart',
     touchPoints: [{ x: touchX, y: touchY, radiusX: 4, radiusY: 4, force: 1 }],
@@ -68,15 +83,25 @@ try {
   });
   await client.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   await page.waitForTimeout(400);
-  const firstBoxAfter = await page.getByLabel('拖动 界面冒烟测试待办').boundingBox();
   const secondBoxAfter = await page.getByLabel('拖动 第二个无日期待办').boundingBox();
+  const thirdBoxAfter = await page.getByLabel('拖动 第三个无日期待办').boundingBox();
   await page.screenshot({ path: 'artifacts/smoke-reorder.png', fullPage: true });
-  assert.ok(firstBoxAfter && secondBoxAfter && secondBoxAfter.y < firstBoxAfter.y, 'Dragged item should move above the first item');
+  assert.ok(secondBoxAfter && thirdBoxAfter && thirdBoxAfter.y < secondBoxAfter.y, 'Dragged item should move above the first item');
   await page.getByText('保存', { exact: true }).click();
-  await page.getByText('待办自定义排序', { exact: true }).waitFor({ state: 'hidden' });
+  await page.getByText('调整顺序', { exact: true }).waitFor({ state: 'hidden' });
   await page.screenshot({ path: 'artifacts/smoke-tasks.png', fullPage: true });
 
-  process.stdout.write('Smoke test passed: today, todo, undo, habit cadence, custom view, and drag reorder.\n');
+  await page.getByText('设置', { exact: true }).last().click();
+  await page.getByText('个人资料', { exact: true }).click();
+  await page.getByPlaceholder('用户名').fill('测试用户');
+  await page.getByPlaceholder('个性签名').fill('今天也向前一点。');
+  await page.getByText('保存', { exact: true }).click();
+  await page.getByPlaceholder('个性签名').waitFor({ state: 'hidden' });
+  await page.getByText('测试用户', { exact: true }).first().waitFor();
+  await page.getByText('今天也向前一点。', { exact: true }).first().waitFor();
+  await page.screenshot({ path: 'artifacts/smoke-settings.png', fullPage: true });
+
+  process.stdout.write('Smoke test passed: flexible date/time, todo undo, habit cadence, long-press reorder, drag, and profile editing.\n');
 } finally {
   await browser.close();
 }

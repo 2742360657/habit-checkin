@@ -14,7 +14,6 @@ import { useHabits } from '../state/HabitStore';
 type TextEntryModalProps = {
   visible: boolean;
   title: string;
-  description: string;
   placeholder: string;
   submitLabel: string;
   initialValue?: string;
@@ -26,7 +25,6 @@ type TextEntryModalProps = {
 export function TextEntryModal({
   visible,
   title,
-  description,
   placeholder,
   submitLabel,
   initialValue = '',
@@ -57,7 +55,6 @@ export function TextEntryModal({
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.description}>{description}</Text>
           <TextInput
             autoFocus
             maxLength={maxLength}
@@ -105,11 +102,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 20,
       fontWeight: '700',
       color: theme.colors.textPrimary,
-    },
-    description: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
     },
     input: {
       borderWidth: 1,

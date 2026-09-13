@@ -9,8 +9,8 @@ import {
 } from 'react';
 
 import {
-  DEFAULT_HOME_HERO_DESCRIPTION,
-  DEFAULT_HOME_HERO_TITLE,
+  DEFAULT_PROFILE_NAME,
+  DEFAULT_PROFILE_SIGNATURE,
   loadAppDataFromDisk,
   saveAppDataToDisk,
 } from '../storage/habitStorage';
@@ -23,7 +23,6 @@ import {
   HabitCadence,
   HabitGroup,
   TodoItem,
-  TodoPriority,
 } from '../types/habit';
 import { clampToMinute, getTodayKey, toLocalDateKey } from '../utils/date';
 import { createId } from '../utils/id';
@@ -41,7 +40,7 @@ type HabitAction =
   | { type: 'clear-error' }
   | { type: 'replace-app-data'; appData: AppData }
   | { type: 'set-theme-id'; themeId: ThemeId }
-  | { type: 'update-home-copy'; title: string; description: string }
+  | { type: 'update-profile'; name: string; signature: string; avatarUri: string | null }
   | { type: 'add-group'; group: HabitGroup }
   | { type: 'rename-group'; groupId: string; name: string }
   | { type: 'delete-group'; groupId: string }
@@ -78,7 +77,6 @@ type HabitAction =
       note: string;
       dueDateKey: string | null;
       dueTime: string | null;
-      priority: TodoPriority;
     }
   | { type: 'set-todo-completed'; todoId: string; completedAt: number | null }
   | { type: 'delete-todo'; todoId: string }
@@ -96,7 +94,6 @@ export type TodoInput = {
   note: string;
   dueDateKey: string | null;
   dueTime: string | null;
-  priority: TodoPriority;
 };
 
 type HabitContextValue = HabitState & {
@@ -123,7 +120,7 @@ type HabitContextValue = HabitState & {
   updateCheckin: (habitId: string, recordId: string, timestamp: number, note: string) => void;
   deleteCheckin: (habitId: string, recordId: string) => void;
   setThemeId: (themeId: ThemeId) => void;
-  updateHomeCopy: (title: string, description: string) => boolean;
+  updateProfile: (name: string, signature: string, avatarUri: string | null) => boolean;
   replaceAppData: (appData: AppData) => void;
   addTodo: (input: TodoInput) => boolean;
   updateTodo: (todoId: string, input: TodoInput) => boolean;
@@ -142,8 +139,9 @@ const initialState: HabitState = {
       todos: [],
     settings: {
       themeId: DEFAULT_THEME_ID,
-      homeHeroTitle: DEFAULT_HOME_HERO_TITLE,
-      homeHeroDescription: DEFAULT_HOME_HERO_DESCRIPTION,
+      profileName: DEFAULT_PROFILE_NAME,
+      profileSignature: DEFAULT_PROFILE_SIGNATURE,
+      avatarUri: null,
     },
   },
   isLoading: true,
@@ -201,15 +199,16 @@ function habitReducer(state: HabitState, action: HabitAction): HabitState {
           },
         },
       };
-    case 'update-home-copy':
+    case 'update-profile':
       return {
         ...state,
         appData: {
           ...state.appData,
           settings: {
             ...state.appData.settings,
-            homeHeroTitle: action.title,
-            homeHeroDescription: action.description,
+            profileName: action.name,
+            profileSignature: action.signature,
+            avatarUri: action.avatarUri,
           },
         },
       };
@@ -409,7 +408,6 @@ function habitReducer(state: HabitState, action: HabitAction): HabitState {
                   note: action.note,
                   dueDateKey: action.dueDateKey,
                   dueTime: action.dueTime,
-                  priority: action.priority,
                 }
               : todo
           ),
@@ -434,7 +432,14 @@ function habitReducer(state: HabitState, action: HabitAction): HabitState {
         },
       };
     case 'reorder-todos': {
-      const orderMap = new Map(action.todoIds.map((id, index) => [id, index]));
+      const selectedIds = new Set(action.todoIds);
+      const availableOrders = state.appData.todos
+        .filter((todo) => selectedIds.has(todo.id))
+        .map((todo) => todo.order)
+        .sort((left, right) => left - right);
+      const orderMap = new Map(
+        action.todoIds.map((id, index) => [id, availableOrders[index] ?? index])
+      );
       return {
         ...state,
         appData: {
@@ -667,25 +672,23 @@ export function HabitProvider({ children }: PropsWithChildren) {
     dispatch({ type: 'set-theme-id', themeId });
   }, []);
 
-  const updateHomeCopy = useCallback((title: string, description: string) => {
-    const trimmedTitle = title.trim();
-    const trimmedDescription = description.trim();
-
-    if (!trimmedTitle || !trimmedDescription) {
-      dispatch({ type: 'set-error', error: '说明文案标题和内容都不能为空。' });
-      return false;
-    }
-
-    dispatch({
-      type: 'update-home-copy',
-      title: trimmedTitle,
-      description: trimmedDescription,
-    });
-    return true;
-  }, []);
-
   const replaceAppData = useCallback((appData: AppData) => {
     dispatch({ type: 'replace-app-data', appData });
+  }, []);
+
+  const updateProfile = useCallback((name: string, signature: string, avatarUri: string | null) => {
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      dispatch({ type: 'set-error', error: '用户名不能为空。' });
+      return false;
+    }
+    dispatch({
+      type: 'update-profile',
+      name: trimmedName,
+      signature: signature.trim(),
+      avatarUri,
+    });
+    return true;
   }, []);
 
   const addTodo = useCallback(
@@ -704,7 +707,6 @@ export function HabitProvider({ children }: PropsWithChildren) {
           note: input.note.trim(),
           dueDateKey: input.dueDateKey,
           dueTime: input.dueTime,
-          priority: input.priority,
           order: state.appData.todos.length,
           createdAt: Date.now(),
           completedAt: null,
@@ -729,7 +731,6 @@ export function HabitProvider({ children }: PropsWithChildren) {
       note: input.note.trim(),
       dueDateKey: input.dueDateKey,
       dueTime: input.dueTime,
-      priority: input.priority,
     });
     return true;
   }, []);
@@ -776,7 +777,7 @@ export function HabitProvider({ children }: PropsWithChildren) {
       updateCheckin,
       deleteCheckin,
       setThemeId,
-      updateHomeCopy,
+      updateProfile,
       replaceAppData,
       addTodo,
       updateTodo,
@@ -802,7 +803,7 @@ export function HabitProvider({ children }: PropsWithChildren) {
     updateCheckin,
     deleteCheckin,
     setThemeId,
-    updateHomeCopy,
+    updateProfile,
     replaceAppData,
     addTodo,
     updateTodo,

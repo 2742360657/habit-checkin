@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 
 import { ArchivedHabitsModal } from '../components/ArchivedHabitsModal';
 import { GroupManagerModal } from '../components/GroupManagerModal';
+import { ProfileEditorModal } from '../components/ProfileEditorModal';
 import { ScreenHeader } from '../components/ScreenHeader';
 import { ThemeSelectionModal } from '../components/ThemeSelectionModal';
 import {
@@ -17,6 +18,7 @@ export function SettingsScreen() {
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [busyAction, setBusyAction] = useState<'backup' | 'restore' | null>(null);
   const [themeVisible, setThemeVisible] = useState(false);
+  const [profileVisible, setProfileVisible] = useState(false);
   const [groupManagerVisible, setGroupManagerVisible] = useState(false);
   const [archivedVisible, setArchivedVisible] = useState(false);
 
@@ -46,7 +48,7 @@ export function SettingsScreen() {
 
       Alert.alert(
         '覆盖恢复确认',
-        `即将使用“${fileAsset.name ?? '所选文件'}”覆盖当前本地全部数据，包括习惯、分组、归档、主题和说明文案。此操作无法撤销。`,
+        `即将使用“${fileAsset.name ?? '所选文件'}”覆盖当前本地全部数据，包括待办、习惯、个人资料和主题。此操作无法撤销。`,
         [
           { text: '取消', style: 'cancel' },
           {
@@ -72,14 +74,15 @@ export function SettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        <ScreenHeader
-          eyebrow="偏好与数据"
-          title="设置"
-          description="不常用的管理项都放在这里，日常操作留给今天页。"
-        />
+        <ScreenHeader title="设置" />
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>外观与整理</Text>
 
+          <SettingRow
+            label="个人资料"
+            value={appData.settings.profileName}
+            onPress={() => setProfileVisible(true)}
+          />
           <SettingRow
             label="色系选择"
             value={theme.label}
@@ -99,7 +102,6 @@ export function SettingsScreen() {
 
         <View style={styles.sectionCard}>
           <Text style={styles.sectionTitle}>数据备份与恢复</Text>
-          <Text style={styles.sectionDescription}>这一项保持直接入口；备份格式为可读 JSON，恢复前会先校验版本和关键字段。</Text>
           <View style={styles.actionRow}>
             <TouchableOpacity
               disabled={busyAction !== null}
@@ -124,6 +126,7 @@ export function SettingsScreen() {
       </ScrollView>
 
       <ThemeSelectionModal visible={themeVisible} onClose={() => setThemeVisible(false)} />
+      <ProfileEditorModal visible={profileVisible} onClose={() => setProfileVisible(false)} />
       <GroupManagerModal visible={groupManagerVisible} onClose={() => setGroupManagerVisible(false)} />
       <ArchivedHabitsModal visible={archivedVisible} onClose={() => setArchivedVisible(false)} />
     </>
@@ -172,11 +175,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 18,
       fontWeight: '800',
       color: theme.colors.textPrimary,
-    },
-    sectionDescription: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
     },
     settingRow: {
       borderRadius: theme.radius.medium,

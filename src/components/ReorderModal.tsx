@@ -3,8 +3,10 @@ import {
   Animated,
   Modal,
   PanResponder,
+  Platform,
   SafeAreaView,
   ScrollView,
+  StatusBar as NativeStatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -22,7 +24,6 @@ export type ReorderItem = {
 type ReorderModalProps = {
   visible: boolean;
   title: string;
-  description?: string;
   items: ReorderItem[];
   onClose: () => void;
   onSave: (ids: string[]) => void;
@@ -40,7 +41,6 @@ function moveItem(items: ReorderItem[], from: number, to: number) {
 export function ReorderModal({
   visible,
   title,
-  description = '按住右侧把手上下拖动，保存后会记住这个顺序。',
   items,
   onClose,
   onSave,
@@ -125,10 +125,9 @@ export function ReorderModal({
           </TouchableOpacity>
         </View>
         <View style={styles.body}>
-          <Text style={styles.description}>{description}</Text>
           {ordered.length === 0 ? (
             <View style={styles.empty}>
-              <Text style={styles.emptyText}>这里还没有可以排序的内容。</Text>
+              <Text style={styles.emptyText}>没有可排序的内容</Text>
             </View>
           ) : (
             <ScrollView scrollEnabled={activeId === null} contentContainerStyle={styles.scrollContent}>
@@ -221,7 +220,11 @@ function DraggableRow({
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    safeArea: {
+      flex: 1,
+      paddingTop: Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 0 : 0,
+      backgroundColor: theme.colors.background,
+    },
     header: {
       minHeight: 64,
       paddingHorizontal: 16,
@@ -238,7 +241,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     saveButton: { borderRadius: 12, backgroundColor: theme.colors.primary },
     saveButtonText: { fontSize: 14, fontWeight: '800', color: theme.colors.white },
     body: { flex: 1, paddingHorizontal: 20, paddingTop: 18 },
-    description: { marginBottom: 16, fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary },
     scrollContent: { paddingBottom: 30 },
     empty: { padding: 18, borderRadius: 16, backgroundColor: theme.colors.surface },
     emptyText: { fontSize: 13, color: theme.colors.textSecondary },

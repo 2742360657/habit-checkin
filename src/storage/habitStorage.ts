@@ -17,18 +17,16 @@ import {
   LegacyV3CheckinRecord,
   LegacyV4AppDataFile,
   TodoItem,
-  TodoPriority,
 } from '../types/habit';
 import { buildFallbackTimestamp, clampToMinute, toLocalDateKey } from '../utils/date';
 import { createId } from '../utils/id';
 
 const DATA_DIRECTORY = `${FileSystem.documentDirectory}habit-checkin/`;
 const DATA_FILE = `${DATA_DIRECTORY}data.json`;
-const BACKUP_FILE_PREFIX = 'habit-checkin-backup';
+const BACKUP_FILE_PREFIX = 'angelime-backup';
 
-export const DEFAULT_HOME_HERO_TITLE = '今天只管打卡，记录会留在习惯里';
-export const DEFAULT_HOME_HERO_DESCRIPTION =
-  '点击右侧 +1 会新增当前本地时间的真实记录，更多编辑统一放到习惯详情里处理。';
+export const DEFAULT_PROFILE_NAME = '酸橙用户';
+export const DEFAULT_PROFILE_SIGNATURE = '';
 
 function isThemeId(value: unknown): value is ThemeId {
   return typeof value === 'string' && value in THEME_PRESETS;
@@ -120,10 +118,6 @@ function isHabitCadence(value: unknown): value is HabitCadence {
   return value === 'daily' || value === 'weekly' || value === 'monthly';
 }
 
-function isTodoPriority(value: unknown): value is TodoPriority {
-  return value === 'normal' || value === 'high';
-}
-
 function sanitizeHabit(candidate: unknown, fallbackOrder = 0): Habit | null {
   if (!candidate || typeof candidate !== 'object') {
     return null;
@@ -199,7 +193,6 @@ function sanitizeTodo(candidate: unknown, fallbackOrder = 0): TodoItem | null {
     note: typeof raw.note === 'string' ? raw.note.trim() : '',
     dueDateKey: typeof raw.dueDateKey === 'string' ? raw.dueDateKey : null,
     dueTime: typeof raw.dueTime === 'string' ? raw.dueTime : null,
-    priority: isTodoPriority(raw.priority) ? raw.priority : 'normal',
     order: typeof raw.order === 'number' ? raw.order : fallbackOrder,
     createdAt: raw.createdAt,
     completedAt: typeof raw.completedAt === 'number' ? raw.completedAt : null,
@@ -211,14 +204,15 @@ function sanitizeSettings(candidate: unknown): AppSettings {
 
   return {
     themeId: isThemeId(raw.themeId) ? raw.themeId : DEFAULT_THEME_ID,
-    homeHeroTitle:
-      typeof raw.homeHeroTitle === 'string' && raw.homeHeroTitle.trim()
-        ? raw.homeHeroTitle.trim()
-        : DEFAULT_HOME_HERO_TITLE,
-    homeHeroDescription:
-      typeof raw.homeHeroDescription === 'string' && raw.homeHeroDescription.trim()
-        ? raw.homeHeroDescription.trim()
-        : DEFAULT_HOME_HERO_DESCRIPTION,
+    profileName:
+      typeof raw.profileName === 'string' && raw.profileName.trim()
+        ? raw.profileName.trim()
+        : DEFAULT_PROFILE_NAME,
+    profileSignature:
+      typeof raw.profileSignature === 'string'
+        ? raw.profileSignature.trim()
+        : DEFAULT_PROFILE_SIGNATURE,
+    avatarUri: typeof raw.avatarUri === 'string' && raw.avatarUri ? raw.avatarUri : null,
   };
 }
 
@@ -445,6 +439,26 @@ export async function pickBackupFile() {
   }
 
   return result.assets[0] ?? null;
+}
+
+export async function pickAndSaveProfileAvatar() {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: 'image/*',
+    copyToCacheDirectory: true,
+    multiple: false,
+  });
+
+  if (result.canceled || !result.assets[0]) {
+    return null;
+  }
+
+  await ensureStorageDirectory();
+  const asset = result.assets[0];
+  const extensionMatch = asset.name?.toLowerCase().match(/\.(png|jpe?g|webp)$/);
+  const extension = extensionMatch?.[0] ?? '.jpg';
+  const destination = `${DATA_DIRECTORY}profile-avatar-${Date.now()}${extension}`;
+  await FileSystem.copyAsync({ from: asset.uri, to: destination });
+  return destination;
 }
 
 export async function importBackupFile(fileUri: string): Promise<AppData> {

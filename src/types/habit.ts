@@ -29,15 +29,12 @@ export type HabitGroup = {
 
 export type HabitCadence = 'daily' | 'weekly' | 'monthly';
 
-export type TodoPriority = 'normal' | 'high';
-
 export type TodoItem = {
   id: string;
   title: string;
   note: string;
   dueDateKey: string | null;
   dueTime: string | null;
-  priority: TodoPriority;
   order: number;
   createdAt: number;
   completedAt: number | null;
@@ -45,8 +42,9 @@ export type TodoItem = {
 
 export type AppSettings = {
   themeId: ThemeId;
-  homeHeroTitle: string;
-  homeHeroDescription: string;
+  profileName: string;
+  profileSignature: string;
+  avatarUri: string | null;
 };
 
 export type AppData = {

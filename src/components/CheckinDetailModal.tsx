@@ -84,11 +84,11 @@ export function CheckinDetailModal({
 
             {readonly ? (
               <View style={styles.banner}>
-                <Text style={styles.bannerText}>该习惯已归档，当前为只读查看模式。</Text>
+                <Text style={styles.bannerText}>已归档 · 只读</Text>
               </View>
             ) : isFutureDateKey(dateKey ?? '') ? (
               <View style={styles.banner}>
-                <Text style={styles.bannerText}>未来日期不可新增或编辑记录。</Text>
+                <Text style={styles.bannerText}>未来日期不可编辑</Text>
               </View>
             ) : (
               <TouchableOpacity onPress={() => setEditorState({ mode: 'add' })} style={styles.addButton}>
@@ -100,9 +100,6 @@ export function CheckinDetailModal({
               {records.length === 0 ? (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyTitle}>这一天还没有记录</Text>
-                  <Text style={styles.emptySubtitle}>
-                    {editable ? '可以点击上方“新增记录”补录打卡。' : '当前只显示已有记录。'}
-                  </Text>
                 </View>
               ) : (
                 records.map((record) => (
@@ -246,11 +243,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 16,
       fontWeight: '700',
       color: theme.colors.textPrimary,
-    },
-    emptySubtitle: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
     },
     recordRow: {
       borderRadius: theme.radius.medium,

@@ -1,7 +1,18 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  SafeAreaView,
+  StatusBar as NativeStatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
+import { ProfileBar } from './src/components/ProfileBar';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { TasksScreen } from './src/screens/TasksScreen';
@@ -50,6 +61,7 @@ function AppShell() {
           </View>
         ) : (
           <View style={styles.content}>
+            <ProfileBar onPress={() => setActiveTab('settings')} />
             <View style={[styles.screen, activeTab !== 'today' && styles.hidden]}>
               <TodayScreen onOpenTasks={() => setActiveTab('tasks')} onOpenHabits={() => setActiveTab('habits')} />
             </View>
@@ -99,7 +111,11 @@ export default function App() {
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    safeArea: {
+      flex: 1,
+      paddingTop: Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 0 : 0,
+      backgroundColor: theme.colors.background,
+    },
     app: { flex: 1, backgroundColor: theme.colors.background },
     content: { flex: 1, paddingBottom: 70 },
     screen: { flex: 1 },

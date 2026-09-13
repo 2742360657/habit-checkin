@@ -1,5 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import {
+  Modal,
+  Platform,
+  Pressable,
+  SafeAreaView,
+  ScrollView,
+  StatusBar as NativeStatusBar,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 
 import { useHabits } from '../state/HabitStore';
 import {
@@ -72,9 +83,7 @@ export function HabitHistoryModal({
             <View style={styles.header}>
               <View style={styles.headerText}>
                 <Text style={styles.title}>{habit?.name ?? '习惯历史'}</Text>
-                <Text style={styles.subtitle}>
-                  {readonly ? '归档习惯，只读查看' : '可查看并打开任意日期详情'}
-                </Text>
+                {readonly ? <Text style={styles.subtitle}>已归档 · 只读</Text> : null}
               </View>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
                 <Text style={styles.closeButtonText}>返回</Text>
@@ -202,7 +211,11 @@ export function HabitHistoryModal({
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    safeArea: {
+      flex: 1,
+      paddingTop: Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 0 : 0,
+      backgroundColor: theme.colors.background,
+    },
     card: {
       flex: 1,
       width: '100%',

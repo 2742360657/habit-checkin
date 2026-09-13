@@ -59,7 +59,6 @@ export function HabitActionModal({
           <Pressable style={styles.backdrop} onPress={onClose} />
           <View style={styles.card}>
             <Text style={styles.title}>{habit.name}</Text>
-            <Text style={styles.description}>调整习惯设置，或查看完整的打卡历史。</Text>
 
             <View style={styles.actionList}>
               <ActionButton
@@ -133,11 +132,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 20,
       fontWeight: '700',
       color: theme.colors.textPrimary,
-    },
-    description: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
     },
     actionList: {
       gap: 10,

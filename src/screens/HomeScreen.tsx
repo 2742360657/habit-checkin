@@ -92,9 +92,7 @@ export function HomeScreen() {
     <View style={styles.screen}>
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <ScreenHeader
-          eyebrow="保持节奏"
           title="习惯"
-          description="按自己的顺序安排，打卡和历史各有清晰入口。"
           action={(
             <TouchableOpacity onPress={() => setAddHabitVisible(true)} style={styles.primaryAction}>
               <Text style={styles.primaryActionText}>＋ 习惯</Text>
@@ -104,21 +102,13 @@ export function HomeScreen() {
 
         <View style={styles.toolbar}>
           <TouchableOpacity onPress={() => setAddGroupVisible(true)} style={styles.toolButton}>
-            <Text style={styles.toolButtonText}>新增分组</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            disabled={orderedGroups.length < 2}
-            onPress={() => setReorderTarget({ kind: 'groups' })}
-            style={[styles.toolButton, orderedGroups.length < 2 && styles.toolButtonDisabled]}
-          >
-            <Text style={styles.toolButtonText}>拖动分组排序</Text>
+            <Text style={styles.toolButtonText}>＋ 分组</Text>
           </TouchableOpacity>
         </View>
 
         {habits.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>从一个小习惯开始</Text>
-            <Text style={styles.emptyDescription}>例如每天阅读 1 次，或者每周运动 3 次。</Text>
+            <Text style={styles.emptyTitle}>还没有习惯</Text>
             <TouchableOpacity onPress={() => setAddHabitVisible(true)} style={styles.emptyAction}>
               <Text style={styles.emptyActionText}>新建第一个习惯</Text>
             </TouchableOpacity>
@@ -133,18 +123,17 @@ export function HomeScreen() {
                     onPress={() =>
                       setCollapsedSections((current) => ({ ...current, [section.id]: !current[section.id] }))
                     }
+                    delayLongPress={360}
+                    onLongPress={() => {
+                      if (orderedGroups.length > 1 && section.groupId !== null) {
+                        setReorderTarget({ kind: 'groups' });
+                      }
+                    }}
                     style={styles.groupHeaderMain}
                   >
                     <Text style={styles.groupTitle}>{section.title}</Text>
                     <Text style={styles.groupMeta}>{section.habits.length} 个 · {collapsed ? '展开' : '收起'}</Text>
                   </Pressable>
-                  <TouchableOpacity
-                    disabled={section.habits.length < 2}
-                    onPress={() => setReorderTarget({ kind: 'habits', groupId: section.groupId, title: section.title })}
-                    style={[styles.sortButton, section.habits.length < 2 && styles.sortButtonDisabled]}
-                  >
-                    <Text style={styles.sortButtonText}>排序</Text>
-                  </TouchableOpacity>
                 </View>
                 {!collapsed ? (
                   <View style={styles.habitList}>
@@ -158,6 +147,15 @@ export function HomeScreen() {
                           onAddCheckin={handleAddCheckin}
                           onOpenDetails={setHistoryHabitId}
                           onOpenActions={setActionHabit}
+                          onLongPress={() => {
+                            if (section.habits.length > 1) {
+                              setReorderTarget({
+                                kind: 'habits',
+                                groupId: section.groupId,
+                                title: section.title,
+                              });
+                            }
+                          }}
                         />
                       ))
                     )}
@@ -174,8 +172,7 @@ export function HomeScreen() {
       <TextEntryModal
         visible={isAddGroupVisible}
         title="新建分组"
-        description="分组用于整理习惯，之后可以随时拖动调整顺序。"
-        placeholder="例如：晨间、运动、学习"
+        placeholder="分组名称"
         submitLabel="保存"
         onClose={() => setAddGroupVisible(false)}
         onSubmit={addGroup}
@@ -194,7 +191,7 @@ export function HomeScreen() {
       />
       <ReorderModal
         visible={reorderTarget !== null}
-        title={reorderTarget?.kind === 'groups' ? '分组排序' : `${reorderTarget?.title ?? ''} · 习惯排序`}
+        title="调整顺序"
         items={reorderItems}
         onClose={() => setReorderTarget(null)}
         onSave={(ids) => {
@@ -226,21 +223,20 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     content: { padding: 20, paddingBottom: 38, gap: 20 },
     primaryAction: { borderRadius: 14, paddingHorizontal: 15, paddingVertical: 11, backgroundColor: theme.colors.primary },
     primaryActionText: { fontSize: 13, fontWeight: '800', color: theme.colors.white },
-    toolbar: { flexDirection: 'row', gap: 10 },
+    toolbar: { flexDirection: 'row' },
     toolButton: {
-      flex: 1,
+      alignSelf: 'flex-start',
       borderRadius: 13,
-      paddingVertical: 11,
+      paddingVertical: 9,
+      paddingHorizontal: 13,
       alignItems: 'center',
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
     },
-    toolButtonDisabled: { opacity: 0.42 },
     toolButtonText: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary },
     emptyCard: { borderRadius: 20, padding: 20, gap: 8, backgroundColor: theme.colors.surface },
     emptyTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.textPrimary },
-    emptyDescription: { fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary },
     emptyAction: { marginTop: 8, alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: theme.colors.primarySoft },
     emptyActionText: { fontSize: 13, fontWeight: '800', color: theme.colors.primary },
     groupSection: { gap: 10 },
@@ -248,9 +244,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     groupHeaderMain: { flex: 1, gap: 3, paddingVertical: 3 },
     groupTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.textPrimary },
     groupMeta: { fontSize: 11, color: theme.colors.textSecondary },
-    sortButton: { borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: theme.colors.surfaceMuted },
-    sortButtonDisabled: { opacity: 0.35 },
-    sortButtonText: { fontSize: 11, fontWeight: '800', color: theme.colors.primary },
     habitList: { gap: 9 },
     groupEmpty: { paddingVertical: 14, fontSize: 13, color: theme.colors.textSecondary },
   });

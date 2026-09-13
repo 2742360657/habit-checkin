@@ -19,7 +19,6 @@ export function ThemeSelectionModal({ visible, onClose }: ThemeSelectionModalPro
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.card}>
           <Text style={styles.title}>色系选择</Text>
-          <Text style={styles.description}>选择后会立即生效，并在下次打开应用时继续保持。</Text>
 
           <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
             {(Object.keys(THEME_PRESETS) as ThemeId[]).map((themeId) => {
@@ -78,11 +77,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 20,
       fontWeight: '700',
       color: theme.colors.textPrimary,
-    },
-    description: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
     },
     list: {
       gap: 10,

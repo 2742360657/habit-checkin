@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useHabits } from '../state/HabitStore';
@@ -10,6 +10,7 @@ type HabitCardProps = {
   onAddCheckin: (habitId: string) => void;
   onOpenDetails: (habitId: string) => void;
   onOpenActions?: (habit: Habit) => void;
+  onLongPress?: (habit: Habit) => void;
   compact?: boolean;
 };
 
@@ -18,17 +19,26 @@ export function HabitCard({
   onAddCheckin,
   onOpenDetails,
   onOpenActions,
+  onLongPress,
   compact = false,
 }: HabitCardProps) {
   const { theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const progress = getHabitProgress(habit);
+  const lastLongPress = useRef(0);
 
   return (
     <View style={[styles.card, compact && styles.cardCompact, progress.completed && styles.cardCompleted]}>
       <TouchableOpacity
         style={styles.infoPressable}
-        onPress={() => onOpenDetails(habit.id)}
+        delayLongPress={360}
+        onLongPress={onLongPress ? () => {
+          lastLongPress.current = Date.now();
+          onLongPress(habit);
+        } : undefined}
+        onPress={() => {
+          if (Date.now() - lastLongPress.current > 700) onOpenDetails(habit.id);
+        }}
       >
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>

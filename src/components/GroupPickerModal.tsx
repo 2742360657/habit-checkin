@@ -52,7 +52,6 @@ export function GroupPickerModal({
         <Pressable style={styles.backdrop} onPress={handleClose} />
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.description}>选择新的所属分组，未选择时会放入“未分组”。</Text>
 
           <ScrollView contentContainerStyle={styles.groupList} showsVerticalScrollIndicator={false}>
             <GroupRow
@@ -126,11 +125,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 20,
       fontWeight: '700',
       color: theme.colors.textPrimary,
-    },
-    description: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
     },
     groupList: {
       gap: 10,

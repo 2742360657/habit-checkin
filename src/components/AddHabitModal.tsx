@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
+  Platform,
   SafeAreaView,
   ScrollView,
+  StatusBar as NativeStatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -19,10 +21,10 @@ type AddHabitModalProps = {
   onClose: () => void;
 };
 
-const CADENCE_OPTIONS: Array<{ id: HabitCadence; label: string; hint: string }> = [
-  { id: 'daily', label: '每天', hint: '每天重新计算' },
-  { id: 'weekly', label: '每周', hint: '周一重新计算' },
-  { id: 'monthly', label: '每月', hint: '每月 1 日重新计算' },
+const CADENCE_OPTIONS: Array<{ id: HabitCadence; label: string }> = [
+  { id: 'daily', label: '每天' },
+  { id: 'weekly', label: '每周' },
+  { id: 'monthly', label: '每月' },
 ];
 
 export function AddHabitModal({ visible, habit = null, onClose }: AddHabitModalProps) {
@@ -76,7 +78,7 @@ export function AddHabitModal({ visible, habit = null, onClose }: AddHabitModalP
             <TextInput
               autoFocus
               maxLength={40}
-              placeholder="例如：喝水、散步、背单词"
+              placeholder="习惯名称"
               placeholderTextColor={theme.colors.textMuted}
               value={name}
               onChangeText={setName}
@@ -96,7 +98,6 @@ export function AddHabitModal({ visible, habit = null, onClose }: AddHabitModalP
                     style={[styles.cadenceCard, active && styles.cadenceCardActive]}
                   >
                     <Text style={[styles.cadenceLabel, active && styles.cadenceLabelActive]}>{option.label}</Text>
-                    <Text style={styles.cadenceHint}>{option.hint}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -106,7 +107,6 @@ export function AddHabitModal({ visible, habit = null, onClose }: AddHabitModalP
           <View style={styles.targetRow}>
             <View style={styles.targetCopy}>
               <Text style={styles.label}>周期内目标次数</Text>
-              <Text style={styles.hint}>例如“每周 3 次”，完成后仍可继续记录。</Text>
             </View>
             <TextInput
               keyboardType="number-pad"
@@ -151,7 +151,11 @@ export function AddHabitModal({ visible, habit = null, onClose }: AddHabitModalP
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
-    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    safeArea: {
+      flex: 1,
+      paddingTop: Platform.OS === 'android' ? NativeStatusBar.currentHeight ?? 0 : 0,
+      backgroundColor: theme.colors.background,
+    },
     header: {
       minHeight: 64,
       paddingHorizontal: 16,
@@ -170,7 +174,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     content: { padding: 20, gap: 24, paddingBottom: 44 },
     field: { gap: 11 },
     label: { fontSize: 14, fontWeight: '800', color: theme.colors.textPrimary },
-    hint: { marginTop: 3, fontSize: 12, lineHeight: 18, color: theme.colors.textSecondary },
     titleInput: {
       borderBottomWidth: 1,
       borderBottomColor: theme.colors.border,
@@ -182,19 +185,17 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     cadenceList: { flexDirection: 'row', gap: 9 },
     cadenceCard: {
       flex: 1,
-      minHeight: 76,
+      minHeight: 54,
       borderWidth: 1,
       borderColor: theme.colors.border,
       borderRadius: 16,
       padding: 12,
       justifyContent: 'center',
-      gap: 5,
       backgroundColor: theme.colors.surface,
     },
     cadenceCardActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft },
     cadenceLabel: { fontSize: 15, fontWeight: '800', color: theme.colors.textPrimary },
     cadenceLabelActive: { color: theme.colors.primary },
-    cadenceHint: { fontSize: 10, lineHeight: 14, color: theme.colors.textSecondary },
     targetRow: {
       flexDirection: 'row',
       alignItems: 'center',

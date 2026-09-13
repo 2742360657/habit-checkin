@@ -10,16 +10,13 @@ import { useHabits } from '../state/HabitStore';
 import { TodoItem } from '../types/habit';
 import { buildTodoBuckets, formatTodoDue } from '../utils/todo';
 
-type SortMode = 'smart' | 'custom';
-
 export function TasksScreen() {
   const { todos, theme, setTodoCompleted, reorderTodos } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [sortMode, setSortMode] = useState<SortMode>('smart');
   const [showCompleted, setShowCompleted] = useState(false);
   const [editorVisible, setEditorVisible] = useState(false);
   const [editingTodo, setEditingTodo] = useState<TodoItem | null>(null);
-  const [reorderVisible, setReorderVisible] = useState(false);
+  const [reorderBucketId, setReorderBucketId] = useState<string | null>(null);
   const [undoTodoId, setUndoTodoId] = useState<string | null>(null);
 
   const openTodos = useMemo(
@@ -31,6 +28,7 @@ export function TasksScreen() {
     [todos]
   );
   const buckets = useMemo(() => buildTodoBuckets(todos), [todos]);
+  const reorderBucket = buckets.find((bucket) => bucket.id === reorderBucketId) ?? null;
 
   const openEditor = (todo: TodoItem | null) => {
     setEditingTodo(todo);
@@ -51,7 +49,6 @@ export function TasksScreen() {
         <ScreenHeader
           eyebrow={`${openTodos.length} 项未完成`}
           title="待办"
-          description="有截止时间时自动按紧急程度排列；无日期也可以安心收在这里。"
           action={(
             <TouchableOpacity onPress={() => openEditor(null)} style={styles.addButton}>
               <Text style={styles.addButtonText}>＋ 新建</Text>
@@ -59,29 +56,14 @@ export function TasksScreen() {
           )}
         />
 
-        <View style={styles.sortBar}>
-          <SortButton label="智能排序" active={sortMode === 'smart'} onPress={() => setSortMode('smart')} />
-          <SortButton label="自定义" active={sortMode === 'custom'} onPress={() => setSortMode('custom')} />
-          {sortMode === 'custom' ? (
-            <TouchableOpacity
-              disabled={openTodos.length < 2}
-              onPress={() => setReorderVisible(true)}
-              style={[styles.reorderButton, openTodos.length < 2 && styles.disabled]}
-            >
-              <Text style={styles.reorderButtonText}>拖动排序</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
         {openTodos.length === 0 ? (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>暂时没有未完成待办</Text>
-            <Text style={styles.emptyText}>记下一件事，不必现在就决定截止时间。</Text>
             <TouchableOpacity onPress={() => openEditor(null)} style={styles.emptyAction}>
               <Text style={styles.emptyActionText}>新建待办</Text>
             </TouchableOpacity>
           </View>
-        ) : sortMode === 'smart' ? (
+        ) : (
           buckets.map((bucket) => (
             <View key={bucket.id} style={styles.section}>
               <View style={styles.sectionHeader}>
@@ -90,17 +72,19 @@ export function TasksScreen() {
               </View>
               <View style={styles.list}>
                 {bucket.todos.map((todo) => (
-                  <TodoRow key={todo.id} todo={todo} onToggle={handleToggle} onPress={openEditor} />
+                  <TodoRow
+                    key={todo.id}
+                    todo={todo}
+                    onToggle={handleToggle}
+                    onPress={openEditor}
+                    onLongPress={() => {
+                      if (bucket.todos.length > 1) setReorderBucketId(bucket.id);
+                    }}
+                  />
                 ))}
               </View>
             </View>
           ))
-        ) : (
-          <View style={styles.list}>
-            {openTodos.map((todo) => (
-              <TodoRow key={todo.id} todo={todo} onToggle={handleToggle} onPress={openEditor} />
-            ))}
-          </View>
         )}
 
         {completedTodos.length > 0 ? (
@@ -129,11 +113,14 @@ export function TasksScreen() {
         }}
       />
       <ReorderModal
-        visible={reorderVisible}
-        title="待办自定义排序"
-        description="这个顺序只用于“自定义”视图；智能视图仍按截止时间排列。"
-        items={openTodos.map((todo) => ({ id: todo.id, label: todo.title, subtitle: formatTodoDue(todo) }))}
-        onClose={() => setReorderVisible(false)}
+        visible={reorderBucket !== null}
+        title="调整顺序"
+        items={(reorderBucket?.todos ?? []).map((todo) => ({
+          id: todo.id,
+          label: todo.title,
+          subtitle: formatTodoDue(todo),
+        }))}
+        onClose={() => setReorderBucketId(null)}
         onSave={reorderTodos}
       />
       <UndoToast
@@ -148,14 +135,6 @@ export function TasksScreen() {
       />
     </View>
   );
-
-  function SortButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-    return (
-      <TouchableOpacity onPress={onPress} style={[styles.sortButton, active && styles.sortButtonActive]}>
-        <Text style={[styles.sortButtonText, active && styles.sortButtonTextActive]}>{label}</Text>
-      </TouchableOpacity>
-    );
-  }
 }
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
@@ -165,14 +144,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     content: { padding: 20, paddingBottom: 42, gap: 22 },
     addButton: { borderRadius: 14, paddingHorizontal: 15, paddingVertical: 11, backgroundColor: theme.colors.primary },
     addButtonText: { fontSize: 13, fontWeight: '800', color: theme.colors.white },
-    sortBar: { flexDirection: 'row', alignItems: 'center', gap: 7 },
-    sortButton: { borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: theme.colors.surfaceMuted },
-    sortButtonActive: { backgroundColor: theme.colors.primarySoft, borderWidth: 1, borderColor: theme.colors.primary },
-    sortButtonText: { fontSize: 12, fontWeight: '700', color: theme.colors.textSecondary },
-    sortButtonTextActive: { color: theme.colors.primary },
-    reorderButton: { marginLeft: 'auto', borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9, backgroundColor: theme.colors.primary },
-    reorderButtonText: { fontSize: 12, fontWeight: '800', color: theme.colors.white },
-    disabled: { opacity: 0.4 },
     section: { gap: 10 },
     sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
     sectionTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.textPrimary },
@@ -181,7 +152,6 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     list: { gap: 8 },
     emptyCard: { borderRadius: 20, padding: 20, gap: 8, backgroundColor: theme.colors.surface },
     emptyTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.textPrimary },
-    emptyText: { fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary },
     emptyAction: { marginTop: 8, alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: theme.colors.primarySoft },
     emptyActionText: { fontSize: 13, fontWeight: '800', color: theme.colors.primary },
     completedHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 3 },

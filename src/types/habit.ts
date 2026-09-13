@@ -12,6 +12,9 @@ export type Habit = {
   id: string;
   name: string;
   groupId: string | null;
+  order: number;
+  cadence: HabitCadence;
+  targetCount: number;
   createdAt: number;
   archivedAt: number | null;
   checkins: CheckinRecord[];
@@ -20,7 +23,24 @@ export type Habit = {
 export type HabitGroup = {
   id: string;
   name: string;
+  order: number;
   createdAt: number;
+};
+
+export type HabitCadence = 'daily' | 'weekly' | 'monthly';
+
+export type TodoPriority = 'normal' | 'high';
+
+export type TodoItem = {
+  id: string;
+  title: string;
+  note: string;
+  dueDateKey: string | null;
+  dueTime: string | null;
+  priority: TodoPriority;
+  order: number;
+  createdAt: number;
+  completedAt: number | null;
 };
 
 export type AppSettings = {
@@ -30,9 +50,10 @@ export type AppSettings = {
 };
 
 export type AppData = {
-  version: 4;
+  version: 5;
   habits: Habit[];
   groups: HabitGroup[];
+  todos: TodoItem[];
   settings: AppSettings;
 };
 
@@ -60,7 +81,7 @@ export type LegacyV2AppDataFile = {
     hiddenAt?: number | null;
     checkins: number[];
   }>;
-  groups: HabitGroup[];
+  groups: Array<Omit<HabitGroup, 'order'>>;
   settings: AppSettings;
 };
 
@@ -83,6 +104,13 @@ export type LegacyV3AppDataFile = {
     archivedAt?: number | null;
     checkins: Array<number | LegacyV3CheckinRecord>;
   }>;
-  groups: HabitGroup[];
+  groups: Array<Omit<HabitGroup, 'order'>>;
+  settings: AppSettings;
+};
+
+export type LegacyV4AppDataFile = {
+  version: 4;
+  habits: Array<Omit<Habit, 'order' | 'cadence' | 'targetCount'>>;
+  groups: Array<Omit<HabitGroup, 'order'>>;
   settings: AppSettings;
 };

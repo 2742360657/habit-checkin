@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useHabits } from '../state/HabitStore';
 import {
@@ -26,6 +26,8 @@ type HabitHistoryModalProps = {
 
 type ViewMode = 'year' | 'month';
 
+let lastHistoryViewMode: ViewMode = 'month';
+
 export function HabitHistoryModal({
   habitId,
   visible,
@@ -35,7 +37,7 @@ export function HabitHistoryModal({
   const { allHabits, theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const today = new Date();
-  const [viewMode, setViewMode] = useState<ViewMode>('year');
+  const [viewMode, setViewMode] = useState<ViewMode>(lastHistoryViewMode);
   const [focusYear, setFocusYear] = useState(today.getFullYear());
   const [focusMonthIndex, setFocusMonthIndex] = useState(today.getMonth());
   const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
@@ -49,7 +51,7 @@ export function HabitHistoryModal({
   useEffect(() => {
     if (visible) {
       const now = new Date();
-      setViewMode('year');
+      setViewMode(lastHistoryViewMode);
       setFocusYear(now.getFullYear());
       setFocusMonthIndex(now.getMonth());
       setSelectedDateKey(null);
@@ -57,12 +59,15 @@ export function HabitHistoryModal({
   }, [visible, habitId]);
 
   const canPressDay = (dateKey: string) => compareDateKeys(dateKey, getTodayKey()) <= 0;
+  const changeViewMode = (mode: ViewMode) => {
+    lastHistoryViewMode = mode;
+    setViewMode(mode);
+  };
 
   return (
     <>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-        <View style={styles.overlay}>
-          <Pressable style={styles.backdrop} onPress={onClose} />
+      <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+        <SafeAreaView style={styles.safeArea}>
           <View style={styles.card}>
             <View style={styles.header}>
               <View style={styles.headerText}>
@@ -72,25 +77,25 @@ export function HabitHistoryModal({
                 </Text>
               </View>
               <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                <Text style={styles.closeButtonText}>关闭</Text>
+                <Text style={styles.closeButtonText}>返回</Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.modeSwitch}>
               <TouchableOpacity
-                onPress={() => setViewMode('year')}
-                style={[styles.modeButton, viewMode === 'year' && styles.modeButtonActive]}
-              >
-                <Text style={[styles.modeButtonText, viewMode === 'year' && styles.modeButtonTextActive]}>
-                  年视图
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setViewMode('month')}
+                onPress={() => changeViewMode('month')}
                 style={[styles.modeButton, viewMode === 'month' && styles.modeButtonActive]}
               >
                 <Text style={[styles.modeButtonText, viewMode === 'month' && styles.modeButtonTextActive]}>
                   月视图
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => changeViewMode('year')}
+                style={[styles.modeButton, viewMode === 'year' && styles.modeButtonActive]}
+              >
+                <Text style={[styles.modeButtonText, viewMode === 'year' && styles.modeButtonTextActive]}>
+                  年视图
                 </Text>
               </TouchableOpacity>
             </View>
@@ -112,30 +117,23 @@ export function HabitHistoryModal({
                   </TouchableOpacity>
                 </View>
 
-                <View style={styles.monthList}>
+                <View style={styles.monthGrid}>
                   {Array.from({ length: 12 }).map((_, monthIndex) => (
                     <Pressable
                       key={`${focusYear}-${monthIndex}`}
                       onPress={() => {
                         setFocusMonthIndex(monthIndex);
-                        setViewMode('month');
+                        changeViewMode('month');
                       }}
                       style={styles.monthCard}
                     >
-                      <Text style={styles.monthTitle}>{formatMonthLabel(focusYear, monthIndex)}</Text>
+                      <Text style={styles.monthTitle}>{monthIndex + 1} 月</Text>
                       <Text style={styles.monthMeta}>
-                        {habit ? getMonthTotal(habit, focusYear, monthIndex) : 0} 次 ·
-                        {habit ? getActiveDayCountInMonth(habit, focusYear, monthIndex) : 0} 天
+                        {habit ? getMonthTotal(habit, focusYear, monthIndex) : 0} 次
                       </Text>
-                      <HistoryCalendar
-                        year={focusYear}
-                        monthIndex={monthIndex}
-                        dateCountMap={dateCountMap}
-                        compact
-                        selectedDateKey={selectedDateKey}
-                        canPressDay={canPressDay}
-                        onPressDay={(dateKey) => setSelectedDateKey(dateKey)}
-                      />
+                      <Text style={styles.monthDays}>
+                        活跃 {habit ? getActiveDayCountInMonth(habit, focusYear, monthIndex) : 0} 天
+                      </Text>
                     </Pressable>
                   ))}
                 </View>
@@ -188,7 +186,7 @@ export function HabitHistoryModal({
               </View>
             )}
           </View>
-        </View>
+        </SafeAreaView>
       </Modal>
 
       <CheckinDetailModal
@@ -204,24 +202,13 @@ export function HabitHistoryModal({
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
-    overlay: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 20,
-      backgroundColor: 'rgba(18, 31, 24, 0.22)',
-    },
-    backdrop: {
-      ...StyleSheet.absoluteFillObject,
-    },
+    safeArea: { flex: 1, backgroundColor: theme.colors.background },
     card: {
+      flex: 1,
       width: '100%',
-      maxHeight: '88%',
-      borderRadius: theme.radius.large,
-      padding: 18,
-      backgroundColor: theme.colors.surface,
+      padding: 20,
+      backgroundColor: theme.colors.background,
       gap: 14,
-      ...theme.shadow,
     },
     header: {
       flexDirection: 'row',
@@ -311,15 +298,18 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 12,
       color: theme.colors.textSecondary,
     },
-    monthList: {
-      gap: 12,
+    monthGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
       paddingBottom: 12,
     },
     monthCard: {
+      width: '48%',
       borderRadius: theme.radius.medium,
-      padding: 14,
-      backgroundColor: theme.colors.background,
-      gap: 10,
+      padding: 16,
+      backgroundColor: theme.colors.surface,
+      gap: 7,
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
@@ -329,7 +319,12 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       color: theme.colors.textPrimary,
     },
     monthMeta: {
-      fontSize: 12,
+      fontSize: 18,
+      fontWeight: '800',
+      color: theme.colors.primary,
+    },
+    monthDays: {
+      fontSize: 11,
       color: theme.colors.textSecondary,
     },
   });

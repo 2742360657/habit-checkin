@@ -9,11 +9,15 @@ import {
   AppSettings,
   CheckinRecord,
   Habit,
+  HabitCadence,
   HabitGroup,
   LegacyV1HabitDataFile,
   LegacyV2AppDataFile,
   LegacyV3AppDataFile,
   LegacyV3CheckinRecord,
+  LegacyV4AppDataFile,
+  TodoItem,
+  TodoPriority,
 } from '../types/habit';
 import { buildFallbackTimestamp, clampToMinute, toLocalDateKey } from '../utils/date';
 import { createId } from '../utils/id';
@@ -90,7 +94,7 @@ function sanitizeCheckinRecord(candidate: unknown): CheckinRecord | null {
   return null;
 }
 
-function sanitizeHabitGroup(candidate: unknown): HabitGroup | null {
+function sanitizeHabitGroup(candidate: unknown, fallbackOrder = 0): HabitGroup | null {
   if (!candidate || typeof candidate !== 'object') {
     return null;
   }
@@ -107,11 +111,20 @@ function sanitizeHabitGroup(candidate: unknown): HabitGroup | null {
   return {
     id: raw.id,
     name: raw.name.trim(),
+    order: typeof raw.order === 'number' ? raw.order : fallbackOrder,
     createdAt: raw.createdAt,
   };
 }
 
-function sanitizeHabit(candidate: unknown): Habit | null {
+function isHabitCadence(value: unknown): value is HabitCadence {
+  return value === 'daily' || value === 'weekly' || value === 'monthly';
+}
+
+function isTodoPriority(value: unknown): value is TodoPriority {
+  return value === 'normal' || value === 'high';
+}
+
+function sanitizeHabit(candidate: unknown, fallbackOrder = 0): Habit | null {
   if (!candidate || typeof candidate !== 'object') {
     return null;
   }
@@ -149,6 +162,12 @@ function sanitizeHabit(candidate: unknown): Habit | null {
     id: raw.id,
     name: raw.name.trim(),
     groupId: typeof raw.groupId === 'string' ? raw.groupId : null,
+    order: typeof raw.order === 'number' ? raw.order : fallbackOrder,
+    cadence: isHabitCadence(raw.cadence) ? raw.cadence : 'daily',
+    targetCount:
+      typeof raw.targetCount === 'number' && Number.isFinite(raw.targetCount)
+        ? Math.max(1, Math.floor(raw.targetCount))
+        : 1,
     createdAt: raw.createdAt,
     archivedAt:
       typeof raw.archivedAt === 'number'
@@ -157,6 +176,33 @@ function sanitizeHabit(candidate: unknown): Habit | null {
           ? raw.hiddenAt
           : null,
     checkins: normalizedCheckins,
+  };
+}
+
+function sanitizeTodo(candidate: unknown, fallbackOrder = 0): TodoItem | null {
+  if (!candidate || typeof candidate !== 'object') {
+    return null;
+  }
+
+  const raw = candidate as Partial<TodoItem>;
+  if (
+    typeof raw.id !== 'string' ||
+    typeof raw.title !== 'string' ||
+    typeof raw.createdAt !== 'number'
+  ) {
+    return null;
+  }
+
+  return {
+    id: raw.id,
+    title: raw.title.trim(),
+    note: typeof raw.note === 'string' ? raw.note.trim() : '',
+    dueDateKey: typeof raw.dueDateKey === 'string' ? raw.dueDateKey : null,
+    dueTime: typeof raw.dueTime === 'string' ? raw.dueTime : null,
+    priority: isTodoPriority(raw.priority) ? raw.priority : 'normal',
+    order: typeof raw.order === 'number' ? raw.order : fallbackOrder,
+    createdAt: raw.createdAt,
+    completedAt: typeof raw.completedAt === 'number' ? raw.completedAt : null,
   };
 }
 
@@ -178,9 +224,10 @@ function sanitizeSettings(candidate: unknown): AppSettings {
 
 function buildDefaultAppData(): AppData {
   return {
-    version: 4,
+    version: 5,
     habits: [],
     groups: [],
+    todos: [],
     settings: sanitizeSettings(null),
   };
 }
@@ -193,28 +240,36 @@ function normalizeAppData(candidate: unknown): AppData {
   const raw = candidate as Partial<AppData>;
   const groups = Array.isArray(raw.groups)
     ? raw.groups
-        .map(sanitizeHabitGroup)
+        .map((group, index) => sanitizeHabitGroup(group, index))
         .filter((group): group is HabitGroup => group !== null)
-        .sort((left, right) => left.createdAt - right.createdAt)
+        .sort((left, right) => left.order - right.order)
     : [];
 
   const groupIds = new Set(groups.map((group) => group.id));
 
   const habits = Array.isArray(raw.habits)
     ? raw.habits
-        .map(sanitizeHabit)
+        .map((habit, index) => sanitizeHabit(habit, index))
         .filter((habit): habit is Habit => habit !== null)
         .map((habit) => ({
           ...habit,
           groupId: habit.groupId && groupIds.has(habit.groupId) ? habit.groupId : null,
         }))
-        .sort((left, right) => left.createdAt - right.createdAt)
+        .sort((left, right) => left.order - right.order)
+    : [];
+
+  const todos = Array.isArray(raw.todos)
+    ? raw.todos
+        .map((todo, index) => sanitizeTodo(todo, index))
+        .filter((todo): todo is TodoItem => todo !== null)
+        .sort((left, right) => left.order - right.order)
     : [];
 
   return {
-    version: 4,
+    version: 5,
     habits,
     groups,
+    todos,
     settings: sanitizeSettings(raw.settings),
   };
 }
@@ -230,20 +285,21 @@ function migrateLegacyV1Data(candidate: unknown): AppData {
   }
 
   const habits = raw.habits
-    .map((habit) =>
+    .map((habit, index) =>
       sanitizeHabit({
         ...habit,
         groupId: null,
         archivedAt: null,
-      })
+      }, index)
     )
     .filter((habit): habit is Habit => habit !== null)
     .sort((left, right) => left.createdAt - right.createdAt);
 
   return {
-    version: 4,
+    version: 5,
     habits,
     groups: [],
+    todos: [],
     settings: sanitizeSettings(null),
   };
 }
@@ -260,7 +316,7 @@ function migrateLegacyV2Data(candidate: unknown): AppData {
 
   return normalizeAppData({
     ...raw,
-    version: 4,
+    version: 5,
     habits: raw.habits.map((habit) => ({
       ...habit,
       archivedAt: habit.hiddenAt ?? null,
@@ -280,7 +336,24 @@ function migrateLegacyV3Data(candidate: unknown): AppData {
 
   return normalizeAppData({
     ...raw,
-    version: 4,
+    version: 5,
+  });
+}
+
+function migrateLegacyV4Data(candidate: unknown): AppData {
+  if (!candidate || typeof candidate !== 'object') {
+    throw new Error('旧版数据格式无效。');
+  }
+
+  const raw = candidate as LegacyV4AppDataFile;
+  if (raw.version !== 4) {
+    throw new Error('旧版数据格式无效。');
+  }
+
+  return normalizeAppData({
+    ...raw,
+    version: 5,
+    todos: [],
   });
 }
 
@@ -290,8 +363,11 @@ export function coerceAppData(candidate: unknown): AppData {
   }
 
   const raw = candidate as { version?: unknown };
-  if (raw.version === 4) {
+  if (raw.version === 5) {
     return normalizeAppData(candidate);
+  }
+  if (raw.version === 4) {
+    return migrateLegacyV4Data(candidate);
   }
   if (raw.version === 3) {
     return migrateLegacyV3Data(candidate);

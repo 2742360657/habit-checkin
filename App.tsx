@@ -1,23 +1,24 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Alert, SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { HomeScreen } from './src/screens/HomeScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { TasksScreen } from './src/screens/TasksScreen';
+import { TodayScreen } from './src/screens/TodayScreen';
 import { HabitProvider, useHabits } from './src/state/HabitStore';
 
-type AppTab = 'checkin' | 'settings';
+type AppTab = 'today' | 'tasks' | 'habits' | 'settings';
+
+const TABS: Array<{ id: AppTab; icon: string; label: string }> = [
+  { id: 'today', icon: '●', label: '今天' },
+  { id: 'tasks', icon: '✓', label: '待办' },
+  { id: 'habits', icon: '↗', label: '习惯' },
+  { id: 'settings', icon: '◇', label: '设置' },
+];
 
 function AppShell() {
-  const [activeTab, setActiveTab] = useState<AppTab>('checkin');
+  const [activeTab, setActiveTab] = useState<AppTab>('today');
   const hasShownErrorRef = useRef<string | null>(null);
   const { isLoading, error, clearError, theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
@@ -26,7 +27,6 @@ function AppShell() {
     if (!error || hasShownErrorRef.current === error) {
       return;
     }
-
     hasShownErrorRef.current = error;
     Alert.alert('存储提示', error, [
       {
@@ -43,58 +43,50 @@ function AppShell() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <View style={styles.app}>
-        <View style={styles.header}>
-          <View>
-            <Text style={styles.title}>打卡喵</Text>
-            <Text style={styles.subtitle}>本地打卡 · 分组整理 · 可备份恢复</Text>
-          </View>
-          <View style={styles.tabBar}>
-            <TabButton
-              label="打卡"
-              isActive={activeTab === 'checkin'}
-              onPress={() => setActiveTab('checkin')}
-            />
-            <TabButton
-              label="设置"
-              isActive={activeTab === 'settings'}
-              onPress={() => setActiveTab('settings')}
-            />
-          </View>
-        </View>
-
         {isLoading ? (
           <View style={styles.loadingState}>
             <ActivityIndicator size="large" color={theme.colors.primary} />
             <Text style={styles.loadingText}>正在读取本地数据...</Text>
           </View>
-        ) : activeTab === 'checkin' ? (
-          <HomeScreen />
         ) : (
-          <SettingsScreen />
+          <View style={styles.content}>
+            <View style={[styles.screen, activeTab !== 'today' && styles.hidden]}>
+              <TodayScreen onOpenTasks={() => setActiveTab('tasks')} onOpenHabits={() => setActiveTab('habits')} />
+            </View>
+            <View style={[styles.screen, activeTab !== 'tasks' && styles.hidden]}>
+              <TasksScreen />
+            </View>
+            <View style={[styles.screen, activeTab !== 'habits' && styles.hidden]}>
+              <HomeScreen />
+            </View>
+            <View style={[styles.screen, activeTab !== 'settings' && styles.hidden]}>
+              <SettingsScreen />
+            </View>
+          </View>
         )}
+
+        {!isLoading ? (
+          <View style={styles.tabBar}>
+            {TABS.map((tab) => {
+              const active = activeTab === tab.id;
+              return (
+                <TouchableOpacity
+                  key={tab.id}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: active }}
+                  onPress={() => setActiveTab(tab.id)}
+                  style={styles.tabButton}
+                >
+                  <Text style={[styles.tabIcon, active && styles.tabIconActive]}>{tab.icon}</Text>
+                  <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>{tab.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        ) : null}
       </View>
     </SafeAreaView>
   );
-
-  function TabButton({
-    label,
-    isActive,
-    onPress,
-  }: {
-    label: string;
-    isActive: boolean;
-    onPress: () => void;
-  }) {
-    return (
-      <TouchableOpacity
-        accessibilityRole="button"
-        onPress={onPress}
-        style={[styles.tabButton, isActive && styles.tabButtonActive]}
-      >
-        <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>{label}</Text>
-      </TouchableOpacity>
-    );
-  }
 }
 
 export default function App() {
@@ -107,66 +99,30 @@ export default function App() {
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
-    safeArea: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    app: {
-      flex: 1,
-      backgroundColor: theme.colors.background,
-    },
-    header: {
-      paddingHorizontal: 20,
-      paddingTop: 18,
-      paddingBottom: 14,
-      backgroundColor: theme.colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.colors.border,
-      gap: 16,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: '700',
-      color: theme.colors.textPrimary,
-    },
-    subtitle: {
-      marginTop: 6,
-      fontSize: 13,
-      color: theme.colors.textSecondary,
-    },
+    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    app: { flex: 1, backgroundColor: theme.colors.background },
+    content: { flex: 1, paddingBottom: 70 },
+    screen: { flex: 1 },
+    hidden: { display: 'none' },
     tabBar: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      minHeight: 70,
+      paddingHorizontal: 8,
+      paddingTop: 7,
       flexDirection: 'row',
-      alignSelf: 'flex-start',
-      padding: 4,
-      borderRadius: 16,
-      backgroundColor: theme.colors.surfaceMuted,
-      gap: 6,
+      borderTopWidth: 1,
+      borderTopColor: theme.colors.border,
+      backgroundColor: theme.colors.surface,
     },
-    tabButton: {
-      paddingVertical: 10,
-      paddingHorizontal: 18,
-      borderRadius: 12,
-    },
-    tabButtonActive: {
-      backgroundColor: theme.colors.primary,
-    },
-    tabButtonText: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: theme.colors.textSecondary,
-    },
-    tabButtonTextActive: {
-      color: theme.colors.white,
-    },
-    loadingState: {
-      flex: 1,
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: 12,
-    },
-    loadingText: {
-      fontSize: 14,
-      color: theme.colors.textSecondary,
-    },
+    tabButton: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
+    tabIcon: { fontSize: 15, fontWeight: '800', color: theme.colors.textMuted },
+    tabIconActive: { color: theme.colors.primary },
+    tabLabel: { fontSize: 11, fontWeight: '700', color: theme.colors.textMuted },
+    tabLabelActive: { color: theme.colors.primary },
+    loadingState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
+    loadingText: { fontSize: 14, color: theme.colors.textSecondary },
   });
 }

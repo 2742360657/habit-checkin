@@ -38,6 +38,11 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+# local UI smoke-test output
+artifacts/
+.edge-test-profile*/
+ui-*.png
+
 # generated native folders
 /ios
 /android

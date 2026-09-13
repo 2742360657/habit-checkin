@@ -1,151 +1,163 @@
-import { useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { AddHabitModal } from '../components/AddHabitModal';
-import { CheckinDetailModal } from '../components/CheckinDetailModal';
 import { HabitActionModal } from '../components/HabitActionModal';
 import { HabitCard } from '../components/HabitCard';
 import { HabitHistoryModal } from '../components/HabitHistoryModal';
+import { ReorderItem, ReorderModal } from '../components/ReorderModal';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { TextEntryModal } from '../components/TextEntryModal';
+import { UndoToast } from '../components/UndoToast';
 import { useHabits } from '../state/HabitStore';
 import { Habit } from '../types/habit';
-import { getTodayKey } from '../utils/date';
 
 type HabitSection = {
   id: string;
+  groupId: string | null;
   title: string;
   habits: Habit[];
 };
 
+type ReorderTarget = { kind: 'groups' } | { kind: 'habits'; groupId: string | null; title: string } | null;
+
 export function HomeScreen() {
-  const { habits, groups, settings, theme, addCheckinNow, addGroup } = useHabits();
+  const {
+    habits,
+    groups,
+    theme,
+    addCheckinNow,
+    deleteCheckin,
+    addGroup,
+    reorderGroups,
+    reorderHabits,
+  } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({});
   const [isAddHabitVisible, setAddHabitVisible] = useState(false);
   const [isAddGroupVisible, setAddGroupVisible] = useState(false);
   const [actionHabit, setActionHabit] = useState<Habit | null>(null);
+  const [editingHabitId, setEditingHabitId] = useState<string | null>(null);
   const [historyHabitId, setHistoryHabitId] = useState<string | null>(null);
-  const [todayDetailHabitId, setTodayDetailHabitId] = useState<string | null>(null);
+  const [reorderTarget, setReorderTarget] = useState<ReorderTarget>(null);
+  const [undoState, setUndoState] = useState<{ habitId: string; recordId: string } | null>(null);
 
+  const orderedGroups = useMemo(
+    () => [...groups].sort((left, right) => left.order - right.order),
+    [groups]
+  );
   const sections = useMemo<HabitSection[]>(() => {
-    const sortedHabits = [...habits].sort((left, right) => right.createdAt - left.createdAt);
-    const groupedHabits = new Map<string, Habit[]>();
-    const ungrouped: Habit[] = [];
-
-    for (const group of groups) {
-      groupedHabits.set(group.id, []);
-    }
-
-    for (const habit of sortedHabits) {
-      if (habit.groupId && groupedHabits.has(habit.groupId)) {
-        groupedHabits.get(habit.groupId)?.push(habit);
-      } else {
-        ungrouped.push(habit);
-      }
-    }
-
-    const nextSections = groups.map((group) => ({
+    const orderedHabits = [...habits].sort((left, right) => left.order - right.order);
+    const result: HabitSection[] = orderedGroups.map((group) => ({
       id: group.id,
+      groupId: group.id,
       title: group.name,
-      habits: groupedHabits.get(group.id) ?? [],
+      habits: orderedHabits.filter((habit) => habit.groupId === group.id),
     }));
-
-    if (ungrouped.length > 0 || groups.length === 0) {
-      nextSections.push({
-        id: 'ungrouped',
-        title: '未分组',
-        habits: ungrouped,
-      });
+    const ungrouped = orderedHabits.filter((habit) => habit.groupId === null);
+    if (ungrouped.length > 0 || orderedGroups.length === 0) {
+      result.push({ id: 'ungrouped', groupId: null, title: '未分组', habits: ungrouped });
     }
+    return result;
+  }, [habits, orderedGroups]);
 
-    return nextSections;
-  }, [groups, habits]);
-
-  const toggleSection = (sectionId: string) => {
-    setCollapsedSections((current) => ({
-      ...current,
-      [sectionId]: !current[sectionId],
+  const editingHabit = habits.find((habit) => habit.id === editingHabitId) ?? null;
+  const reorderItems = useMemo<ReorderItem[]>(() => {
+    if (!reorderTarget) {
+      return [];
+    }
+    if (reorderTarget.kind === 'groups') {
+      return orderedGroups.map((group) => ({
+        id: group.id,
+        label: group.name,
+        subtitle: `${habits.filter((habit) => habit.groupId === group.id).length} 个习惯`,
+      }));
+    }
+    const section = sections.find((item) => item.groupId === reorderTarget.groupId);
+    return (section?.habits ?? []).map((habit) => ({
+      id: habit.id,
+      label: habit.name,
+      subtitle: habit.cadence === 'daily' ? '每天' : habit.cadence === 'weekly' ? '每周' : '每月',
     }));
+  }, [habits, orderedGroups, reorderTarget, sections]);
+
+  const handleAddCheckin = (habitId: string) => {
+    const recordId = addCheckinNow(habitId);
+    setUndoState({ habitId, recordId });
   };
 
+  const dismissUndo = useCallback(() => setUndoState(null), []);
+
   return (
-    <>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.heroCard}>
-          <View style={styles.heroHeader}>
-            <View style={styles.heroText}>
-              <Text style={styles.heroTitle}>{settings.homeHeroTitle}</Text>
-              <Text style={styles.heroDescription}>{settings.homeHeroDescription}</Text>
-            </View>
-            <View style={styles.heroStats}>
-              <Text style={styles.heroStatLabel}>当前活跃习惯</Text>
-              <Text style={styles.heroStatValue}>{habits.length}</Text>
-            </View>
-          </View>
-          <View style={styles.heroActions}>
-            <TouchableOpacity
-              onPress={() => setAddGroupVisible(true)}
-              style={styles.secondaryAction}
-            >
-              <Text style={styles.secondaryActionText}>新增分组</Text>
-            </TouchableOpacity>
+    <View style={styles.screen}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScreenHeader
+          eyebrow="保持节奏"
+          title="习惯"
+          description="按自己的顺序安排，打卡和历史各有清晰入口。"
+          action={(
             <TouchableOpacity onPress={() => setAddHabitVisible(true)} style={styles.primaryAction}>
-              <Text style={styles.primaryActionText}>新增习惯</Text>
+              <Text style={styles.primaryActionText}>＋ 习惯</Text>
             </TouchableOpacity>
-          </View>
+          )}
+        />
+
+        <View style={styles.toolbar}>
+          <TouchableOpacity onPress={() => setAddGroupVisible(true)} style={styles.toolButton}>
+            <Text style={styles.toolButtonText}>新增分组</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            disabled={orderedGroups.length < 2}
+            onPress={() => setReorderTarget({ kind: 'groups' })}
+            style={[styles.toolButton, orderedGroups.length < 2 && styles.toolButtonDisabled]}
+          >
+            <Text style={styles.toolButtonText}>拖动分组排序</Text>
+          </TouchableOpacity>
         </View>
 
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>按分组打卡</Text>
-          <Text style={styles.sectionMeta}>点击习惯打开今天详情，长按打开设置和历史入口</Text>
-        </View>
-
-        {sections.length === 0 ? (
+        {habits.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>还没有习惯</Text>
-            <Text style={styles.emptyDescription}>
-              先创建分组或习惯，打卡页会按分组整理展示。
-            </Text>
+            <Text style={styles.emptyTitle}>从一个小习惯开始</Text>
+            <Text style={styles.emptyDescription}>例如每天阅读 1 次，或者每周运动 3 次。</Text>
+            <TouchableOpacity onPress={() => setAddHabitVisible(true)} style={styles.emptyAction}>
+              <Text style={styles.emptyActionText}>新建第一个习惯</Text>
+            </TouchableOpacity>
           </View>
         ) : (
           sections.map((section) => {
             const collapsed = collapsedSections[section.id] ?? false;
-
             return (
-              <View key={section.id} style={styles.groupCard}>
-                <Pressable onPress={() => toggleSection(section.id)} style={styles.groupHeader}>
-                  <View style={styles.groupHeaderText}>
+              <View key={section.id} style={styles.groupSection}>
+                <View style={styles.groupHeader}>
+                  <Pressable
+                    onPress={() =>
+                      setCollapsedSections((current) => ({ ...current, [section.id]: !current[section.id] }))
+                    }
+                    style={styles.groupHeaderMain}
+                  >
                     <Text style={styles.groupTitle}>{section.title}</Text>
-                    <Text style={styles.groupMeta}>{section.habits.length} 个习惯</Text>
-                  </View>
-                  <Text style={styles.groupChevron}>{collapsed ? '展开' : '收起'}</Text>
-                </Pressable>
-
+                    <Text style={styles.groupMeta}>{section.habits.length} 个 · {collapsed ? '展开' : '收起'}</Text>
+                  </Pressable>
+                  <TouchableOpacity
+                    disabled={section.habits.length < 2}
+                    onPress={() => setReorderTarget({ kind: 'habits', groupId: section.groupId, title: section.title })}
+                    style={[styles.sortButton, section.habits.length < 2 && styles.sortButtonDisabled]}
+                  >
+                    <Text style={styles.sortButtonText}>排序</Text>
+                  </TouchableOpacity>
+                </View>
                 {!collapsed ? (
-                  <View style={styles.groupBody}>
+                  <View style={styles.habitList}>
                     {section.habits.length === 0 ? (
-                      <View style={styles.groupEmpty}>
-                        <Text style={styles.groupEmptyText}>这个分组里还没有习惯</Text>
-                      </View>
+                      <Text style={styles.groupEmpty}>这个分组里还没有习惯</Text>
                     ) : (
                       section.habits.map((habit) => (
                         <HabitCard
                           key={habit.id}
                           habit={habit}
-                          onAddCheckin={addCheckinNow}
-                          onOpenDetails={setTodayDetailHabitId}
-                          onLongPress={setActionHabit}
+                          onAddCheckin={handleAddCheckin}
+                          onOpenDetails={setHistoryHabitId}
+                          onOpenActions={setActionHabit}
                         />
                       ))
                     )}
@@ -158,10 +170,11 @@ export function HomeScreen() {
       </ScrollView>
 
       <AddHabitModal visible={isAddHabitVisible} onClose={() => setAddHabitVisible(false)} />
+      <AddHabitModal habit={editingHabit} visible={editingHabitId !== null} onClose={() => setEditingHabitId(null)} />
       <TextEntryModal
         visible={isAddGroupVisible}
         title="新建分组"
-        description="分组会作为打卡页的主要组织方式显示。"
+        description="分组用于整理习惯，之后可以随时拖动调整顺序。"
         placeholder="例如：晨间、运动、学习"
         submitLabel="保存"
         onClose={() => setAddGroupVisible(false)}
@@ -171,187 +184,74 @@ export function HomeScreen() {
         habit={actionHabit}
         visible={actionHabit !== null}
         onClose={() => setActionHabit(null)}
-        onOpenHistory={(habitId) => setHistoryHabitId(habitId)}
+        onEdit={setEditingHabitId}
+        onOpenHistory={setHistoryHabitId}
       />
       <HabitHistoryModal
         habitId={historyHabitId}
         visible={historyHabitId !== null}
         onClose={() => setHistoryHabitId(null)}
       />
-      <CheckinDetailModal
-        habitId={todayDetailHabitId}
-        dateKey={todayDetailHabitId ? getTodayKey() : null}
-        visible={todayDetailHabitId !== null}
-        onClose={() => setTodayDetailHabitId(null)}
+      <ReorderModal
+        visible={reorderTarget !== null}
+        title={reorderTarget?.kind === 'groups' ? '分组排序' : `${reorderTarget?.title ?? ''} · 习惯排序`}
+        items={reorderItems}
+        onClose={() => setReorderTarget(null)}
+        onSave={(ids) => {
+          if (reorderTarget?.kind === 'groups') {
+            reorderGroups(ids);
+          } else if (reorderTarget?.kind === 'habits') {
+            reorderHabits(reorderTarget.groupId, ids);
+          }
+        }}
       />
-    </>
+      <UndoToast
+        message={undoState ? '已记录一次打卡' : null}
+        onDismiss={dismissUndo}
+        onUndo={() => {
+          if (undoState) {
+            deleteCheckin(undoState.habitId, undoState.recordId);
+          }
+          setUndoState(null);
+        }}
+      />
+    </View>
   );
 }
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
-    scrollView: {
+    screen: { flex: 1 },
+    scrollView: { flex: 1 },
+    content: { padding: 20, paddingBottom: 38, gap: 20 },
+    primaryAction: { borderRadius: 14, paddingHorizontal: 15, paddingVertical: 11, backgroundColor: theme.colors.primary },
+    primaryActionText: { fontSize: 13, fontWeight: '800', color: theme.colors.white },
+    toolbar: { flexDirection: 'row', gap: 10 },
+    toolButton: {
       flex: 1,
-    },
-    content: {
-      padding: 20,
-      gap: 14,
-    },
-    heroCard: {
-      borderRadius: theme.radius.large,
-      padding: 18,
-      backgroundColor: theme.colors.primarySoft,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      gap: 14,
-    },
-    heroHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      gap: 12,
-      alignItems: 'flex-start',
-    },
-    heroText: {
-      flex: 1,
-      gap: 6,
-    },
-    heroTitle: {
-      fontSize: 22,
-      fontWeight: '800',
-      color: theme.colors.textPrimary,
-    },
-    heroDescription: {
-      fontSize: 14,
-      lineHeight: 21,
-      color: theme.colors.textSecondary,
-    },
-    heroStats: {
-      minWidth: 92,
-      borderRadius: theme.radius.medium,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      backgroundColor: theme.colors.surface,
-      alignItems: 'center',
-      gap: 4,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-    },
-    heroStatLabel: {
-      fontSize: 11,
-      color: theme.colors.textSecondary,
-    },
-    heroStatValue: {
-      fontSize: 24,
-      fontWeight: '800',
-      color: theme.colors.primary,
-    },
-    heroActions: {
-      flexDirection: 'row',
-      gap: 10,
-    },
-    primaryAction: {
-      flex: 1,
-      borderRadius: 14,
-      paddingVertical: 12,
-      alignItems: 'center',
-      backgroundColor: theme.colors.primary,
-    },
-    primaryActionText: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: theme.colors.white,
-    },
-    secondaryAction: {
-      flex: 1,
-      borderRadius: 14,
-      paddingVertical: 12,
+      borderRadius: 13,
+      paddingVertical: 11,
       alignItems: 'center',
       borderWidth: 1,
       borderColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
     },
-    secondaryActionText: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: theme.colors.textSecondary,
-    },
-    sectionHeader: {
-      gap: 4,
-    },
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: '800',
-      color: theme.colors.textPrimary,
-    },
-    sectionMeta: {
-      fontSize: 12,
-      color: theme.colors.textSecondary,
-    },
-    emptyCard: {
-      borderRadius: theme.radius.large,
-      padding: 18,
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      gap: 8,
-    },
-    emptyTitle: {
-      fontSize: 16,
-      fontWeight: '700',
-      color: theme.colors.textPrimary,
-    },
-    emptyDescription: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
-    },
-    groupCard: {
-      borderRadius: theme.radius.large,
-      backgroundColor: theme.colors.surface,
-      borderWidth: 1,
-      borderColor: theme.colors.border,
-      overflow: 'hidden',
-    },
-    groupHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      gap: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      backgroundColor: theme.colors.surfaceMuted,
-    },
-    groupHeaderText: {
-      flex: 1,
-      gap: 2,
-    },
-    groupTitle: {
-      fontSize: 16,
-      fontWeight: '800',
-      color: theme.colors.textPrimary,
-    },
-    groupMeta: {
-      fontSize: 12,
-      color: theme.colors.textSecondary,
-    },
-    groupChevron: {
-      fontSize: 12,
-      fontWeight: '700',
-      color: theme.colors.primary,
-    },
-    groupBody: {
-      padding: 12,
-      gap: 10,
-    },
-    groupEmpty: {
-      borderRadius: theme.radius.medium,
-      paddingVertical: 14,
-      paddingHorizontal: 14,
-      backgroundColor: theme.colors.background,
-    },
-    groupEmptyText: {
-      fontSize: 13,
-      color: theme.colors.textSecondary,
-    },
+    toolButtonDisabled: { opacity: 0.42 },
+    toolButtonText: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary },
+    emptyCard: { borderRadius: 20, padding: 20, gap: 8, backgroundColor: theme.colors.surface },
+    emptyTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.textPrimary },
+    emptyDescription: { fontSize: 13, lineHeight: 20, color: theme.colors.textSecondary },
+    emptyAction: { marginTop: 8, alignSelf: 'flex-start', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 10, backgroundColor: theme.colors.primarySoft },
+    emptyActionText: { fontSize: 13, fontWeight: '800', color: theme.colors.primary },
+    groupSection: { gap: 10 },
+    groupHeader: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    groupHeaderMain: { flex: 1, gap: 3, paddingVertical: 3 },
+    groupTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.textPrimary },
+    groupMeta: { fontSize: 11, color: theme.colors.textSecondary },
+    sortButton: { borderRadius: 10, paddingHorizontal: 11, paddingVertical: 8, backgroundColor: theme.colors.surfaceMuted },
+    sortButtonDisabled: { opacity: 0.35 },
+    sortButtonText: { fontSize: 11, fontWeight: '800', color: theme.colors.primary },
+    habitList: { gap: 9 },
+    groupEmpty: { paddingVertical: 14, fontSize: 13, color: theme.colors.textSecondary },
   });
 }

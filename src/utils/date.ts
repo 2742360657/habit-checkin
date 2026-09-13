@@ -37,6 +37,36 @@ export function getTodayKey() {
   return toLocalDateKey(Date.now());
 }
 
+export function addDaysToDateKey(dateKey: string, days: number) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return toLocalDateKey(new Date(year, month - 1, day + days, 12, 0, 0, 0).getTime());
+}
+
+export function isValidDateKey(dateKey: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    return false;
+  }
+  const [year, month, day] = dateKey.split('-').map(Number);
+  const date = new Date(year, month - 1, day);
+  return (
+    date.getFullYear() === year &&
+    date.getMonth() === month - 1 &&
+    date.getDate() === day
+  );
+}
+
+export function formatFriendlyDate(dateKey: string) {
+  const todayKey = getTodayKey();
+  if (dateKey === todayKey) {
+    return '今天';
+  }
+  if (dateKey === addDaysToDateKey(todayKey, 1)) {
+    return '明天';
+  }
+  const [, month, day] = dateKey.split('-').map(Number);
+  return `${month}月${day}日`;
+}
+
 export function getDaysInMonth(year: number, monthIndex: number) {
   return new Date(year, monthIndex + 1, 0).getDate();
 }

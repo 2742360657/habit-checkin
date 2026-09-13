@@ -7,6 +7,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
+    "test:smoke-web": "node scripts/smoke-web.mjs",
     "build:apk": "eas build -p android --profile preview"
   },
   "dependencies": {
@@ -16,12 +17,15 @@
     "expo-sharing": "~55.0.14",
     "expo-status-bar": "~55.0.4",
     "react": "19.2.0",
-    "react-native": "0.83.2"
+    "react-dom": "^19.2.0",
+    "react-native": "0.83.2",
+    "react-native-web": "^0.21.2"
   },
   "devDependencies": {
     "@expo/ngrok": "^4.1.3",
     "@types/react": "~19.2.2",
     "eas-cli": "^18.4.0",
+    "playwright-core": "^1.63.0",
     "typescript": "~5.9.2"
   },
   "private": true

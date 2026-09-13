@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
-  Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,95 +10,137 @@ import {
   View,
 } from 'react-native';
 
-import { useHabits } from '../state/HabitStore';
+import { HabitInput, useHabits } from '../state/HabitStore';
+import { Habit, HabitCadence } from '../types/habit';
 
 type AddHabitModalProps = {
   visible: boolean;
+  habit?: Habit | null;
   onClose: () => void;
 };
 
-export function AddHabitModal({ visible, onClose }: AddHabitModalProps) {
-  const { theme, groups, addHabit } = useHabits();
+const CADENCE_OPTIONS: Array<{ id: HabitCadence; label: string; hint: string }> = [
+  { id: 'daily', label: '每天', hint: '每天重新计算' },
+  { id: 'weekly', label: '每周', hint: '周一重新计算' },
+  { id: 'monthly', label: '每月', hint: '每月 1 日重新计算' },
+];
+
+export function AddHabitModal({ visible, habit = null, onClose }: AddHabitModalProps) {
+  const { theme, groups, addHabit, updateHabit } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [name, setName] = useState('');
   const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null);
+  const [cadence, setCadence] = useState<HabitCadence>('daily');
+  const [targetCount, setTargetCount] = useState('1');
 
   useEffect(() => {
     if (!visible) {
-      setName('');
-      setSelectedGroupId(null);
+      return;
     }
-  }, [visible]);
+    setName(habit?.name ?? '');
+    setSelectedGroupId(habit?.groupId ?? null);
+    setCadence(habit?.cadence ?? 'daily');
+    setTargetCount(String(habit?.targetCount ?? 1));
+  }, [habit, visible]);
 
   const handleSubmit = () => {
-    const success = addHabit(name, selectedGroupId);
+    const numericTarget = Math.max(1, Math.min(999, Number.parseInt(targetCount, 10) || 1));
+    const input: HabitInput = {
+      name,
+      groupId: selectedGroupId,
+      cadence,
+      targetCount: numericTarget,
+    };
+    const success = habit ? updateHabit(habit.id, input) : addHabit(input);
     if (success) {
       onClose();
     }
   };
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <View style={styles.card}>
-          <Text style={styles.title}>新建习惯</Text>
-          <Text style={styles.description}>输入习惯名称，并为它选择一个分组。</Text>
-          <TextInput
-            autoFocus
-            maxLength={24}
-            placeholder="例如：喝水、散步、背单词"
-            placeholderTextColor={theme.colors.textMuted}
-            value={name}
-            onChangeText={setName}
-            style={styles.input}
-          />
-
-          <View style={styles.groupSection}>
-            <Text style={styles.groupTitle}>所属分组</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.groupList}
-            >
-              <GroupOption
-                label="未分组"
-                selected={selectedGroupId === null}
-                onPress={() => setSelectedGroupId(null)}
-              />
-              {groups.map((group) => (
-                <GroupOption
-                  key={group.id}
-                  label={group.name}
-                  selected={selectedGroupId === group.id}
-                  onPress={() => setSelectedGroupId(group.id)}
-                />
-              ))}
-            </ScrollView>
-          </View>
-
-          <View style={styles.actions}>
-            <TouchableOpacity onPress={onClose} style={[styles.button, styles.secondaryButton]}>
-              <Text style={styles.secondaryButtonText}>取消</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handleSubmit} style={[styles.button, styles.primaryButton]}>
-              <Text style={styles.primaryButtonText}>保存</Text>
-            </TouchableOpacity>
-          </View>
+    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+      <SafeAreaView style={styles.safeArea}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onClose} style={styles.headerButton}>
+            <Text style={styles.headerButtonText}>取消</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{habit ? '编辑习惯' : '新建习惯'}</Text>
+          <TouchableOpacity onPress={handleSubmit} style={[styles.headerButton, styles.saveButton]}>
+            <Text style={styles.saveButtonText}>保存</Text>
+          </TouchableOpacity>
         </View>
-      </View>
+
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <View style={styles.field}>
+            <Text style={styles.label}>习惯名称</Text>
+            <TextInput
+              autoFocus
+              maxLength={40}
+              placeholder="例如：喝水、散步、背单词"
+              placeholderTextColor={theme.colors.textMuted}
+              value={name}
+              onChangeText={setName}
+              style={styles.titleInput}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>目标周期</Text>
+            <View style={styles.cadenceList}>
+              {CADENCE_OPTIONS.map((option) => {
+                const active = cadence === option.id;
+                return (
+                  <TouchableOpacity
+                    key={option.id}
+                    onPress={() => setCadence(option.id)}
+                    style={[styles.cadenceCard, active && styles.cadenceCardActive]}
+                  >
+                    <Text style={[styles.cadenceLabel, active && styles.cadenceLabelActive]}>{option.label}</Text>
+                    <Text style={styles.cadenceHint}>{option.hint}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+
+          <View style={styles.targetRow}>
+            <View style={styles.targetCopy}>
+              <Text style={styles.label}>周期内目标次数</Text>
+              <Text style={styles.hint}>例如“每周 3 次”，完成后仍可继续记录。</Text>
+            </View>
+            <TextInput
+              keyboardType="number-pad"
+              maxLength={3}
+              value={targetCount}
+              onChangeText={setTargetCount}
+              selectTextOnFocus
+              style={styles.targetInput}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <Text style={styles.label}>所属分组</Text>
+            <View style={styles.groupList}>
+              <GroupOption label="未分组" selected={selectedGroupId === null} onPress={() => setSelectedGroupId(null)} />
+              {groups
+                .slice()
+                .sort((left, right) => left.order - right.order)
+                .map((group) => (
+                  <GroupOption
+                    key={group.id}
+                    label={group.name}
+                    selected={selectedGroupId === group.id}
+                    onPress={() => setSelectedGroupId(group.id)}
+                  />
+                ))}
+            </View>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
     </Modal>
   );
 
-  function GroupOption({
-    label,
-    selected,
-    onPress,
-  }: {
-    label: string;
-    selected: boolean;
-    onPress: () => void;
-  }) {
+  function GroupOption({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
     return (
       <TouchableOpacity onPress={onPress} style={[styles.groupChip, selected && styles.groupChipActive]}>
         <Text style={[styles.groupChipText, selected && styles.groupChipTextActive]}>{label}</Text>
@@ -109,103 +151,82 @@ export function AddHabitModal({ visible, onClose }: AddHabitModalProps) {
 
 function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
-    overlay: {
-      flex: 1,
-      justifyContent: 'center',
+    safeArea: { flex: 1, backgroundColor: theme.colors.background },
+    header: {
+      minHeight: 64,
+      paddingHorizontal: 16,
+      flexDirection: 'row',
       alignItems: 'center',
-      padding: 24,
-      backgroundColor: 'rgba(18, 31, 24, 0.22)',
-    },
-    backdrop: {
-      ...StyleSheet.absoluteFillObject,
-    },
-    card: {
-      width: '100%',
-      borderRadius: theme.radius.large,
-      padding: 20,
+      justifyContent: 'space-between',
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
       backgroundColor: theme.colors.surface,
-      gap: 14,
-      ...theme.shadow,
     },
-    title: {
-      fontSize: 20,
+    headerTitle: { fontSize: 17, fontWeight: '800', color: theme.colors.textPrimary },
+    headerButton: { minWidth: 60, paddingHorizontal: 10, paddingVertical: 10, alignItems: 'center' },
+    headerButtonText: { fontSize: 14, fontWeight: '700', color: theme.colors.textSecondary },
+    saveButton: { borderRadius: 12, backgroundColor: theme.colors.primary },
+    saveButtonText: { fontSize: 14, fontWeight: '800', color: theme.colors.white },
+    content: { padding: 20, gap: 24, paddingBottom: 44 },
+    field: { gap: 11 },
+    label: { fontSize: 14, fontWeight: '800', color: theme.colors.textPrimary },
+    hint: { marginTop: 3, fontSize: 12, lineHeight: 18, color: theme.colors.textSecondary },
+    titleInput: {
+      borderBottomWidth: 1,
+      borderBottomColor: theme.colors.border,
+      paddingVertical: 14,
+      fontSize: 21,
       fontWeight: '700',
       color: theme.colors.textPrimary,
     },
-    description: {
-      fontSize: 13,
-      lineHeight: 20,
-      color: theme.colors.textSecondary,
-    },
-    input: {
+    cadenceList: { flexDirection: 'row', gap: 9 },
+    cadenceCard: {
+      flex: 1,
+      minHeight: 76,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      borderRadius: theme.radius.small,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      fontSize: 16,
-      color: theme.colors.textPrimary,
-      backgroundColor: theme.colors.background,
+      borderRadius: 16,
+      padding: 12,
+      justifyContent: 'center',
+      gap: 5,
+      backgroundColor: theme.colors.surface,
     },
-    groupSection: {
-      gap: 10,
+    cadenceCardActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft },
+    cadenceLabel: { fontSize: 15, fontWeight: '800', color: theme.colors.textPrimary },
+    cadenceLabelActive: { color: theme.colors.primary },
+    cadenceHint: { fontSize: 10, lineHeight: 14, color: theme.colors.textSecondary },
+    targetRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 16,
+      padding: 16,
+      borderRadius: 16,
+      backgroundColor: theme.colors.surface,
+      borderWidth: 1,
+      borderColor: theme.colors.border,
     },
-    groupTitle: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.colors.textPrimary,
+    targetCopy: { flex: 1 },
+    targetInput: {
+      width: 66,
+      height: 48,
+      borderRadius: 13,
+      textAlign: 'center',
+      fontSize: 20,
+      fontWeight: '800',
+      color: theme.colors.primary,
+      backgroundColor: theme.colors.primarySoft,
     },
-    groupList: {
-      gap: 10,
-    },
+    groupList: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
     groupChip: {
-      borderRadius: theme.radius.pill,
+      borderRadius: 999,
       borderWidth: 1,
       borderColor: theme.colors.border,
-      backgroundColor: theme.colors.surfaceMuted,
+      backgroundColor: theme.colors.surface,
       paddingHorizontal: 14,
       paddingVertical: 10,
     },
-    groupChipActive: {
-      borderColor: theme.colors.primary,
-      backgroundColor: theme.colors.primarySoft,
-    },
-    groupChipText: {
-      fontSize: 13,
-      fontWeight: '600',
-      color: theme.colors.textSecondary,
-    },
-    groupChipTextActive: {
-      color: theme.colors.primary,
-    },
-    actions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
-      gap: 10,
-    },
-    button: {
-      minWidth: 92,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 12,
-      paddingVertical: 12,
-      paddingHorizontal: 16,
-    },
-    primaryButton: {
-      backgroundColor: theme.colors.primary,
-    },
-    primaryButtonText: {
-      fontSize: 14,
-      fontWeight: '700',
-      color: theme.colors.white,
-    },
-    secondaryButton: {
-      backgroundColor: theme.colors.surfaceMuted,
-    },
-    secondaryButtonText: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: theme.colors.textSecondary,
-    },
+    groupChipActive: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primarySoft },
+    groupChipText: { fontSize: 13, fontWeight: '700', color: theme.colors.textSecondary },
+    groupChipTextActive: { color: theme.colors.primary },
   });
 }

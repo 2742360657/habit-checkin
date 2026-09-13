@@ -1,46 +1,53 @@
 import { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useHabits } from '../state/HabitStore';
 import { Habit } from '../types/habit';
-import { getTodayCount } from '../utils/habit';
+import { getHabitProgress } from '../utils/habit';
 
 type HabitCardProps = {
   habit: Habit;
   onAddCheckin: (habitId: string) => void;
   onOpenDetails: (habitId: string) => void;
-  onLongPress: (habit: Habit) => void;
+  onOpenActions?: (habit: Habit) => void;
+  compact?: boolean;
 };
 
 export function HabitCard({
   habit,
   onAddCheckin,
   onOpenDetails,
-  onLongPress,
+  onOpenActions,
+  compact = false,
 }: HabitCardProps) {
   const { theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const todayCount = getTodayCount(habit);
+  const progress = getHabitProgress(habit);
 
   return (
-    <View style={styles.card}>
-      <Pressable
+    <View style={[styles.card, compact && styles.cardCompact, progress.completed && styles.cardCompleted]}>
+      <TouchableOpacity
         style={styles.infoPressable}
         onPress={() => onOpenDetails(habit.id)}
-        onLongPress={() => onLongPress(habit)}
-        delayLongPress={240}
       >
         <View style={styles.info}>
           <Text style={styles.name} numberOfLines={1}>
             {habit.name}
           </Text>
-          <Text style={styles.countText}>今日 {todayCount} 次</Text>
+          <Text style={[styles.countText, progress.completed && styles.countTextDone]}>
+            {progress.completed ? `已完成 · ${progress.label}` : progress.label}
+          </Text>
         </View>
-      </Pressable>
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={() => onAddCheckin(habit.id)} style={styles.plusButton}>
         <Text style={styles.plusText}>+1</Text>
       </TouchableOpacity>
+      {onOpenActions ? (
+        <TouchableOpacity accessibilityLabel="习惯操作" onPress={() => onOpenActions(habit)} style={styles.moreButton}>
+          <Text style={styles.moreText}>•••</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -57,6 +64,12 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       backgroundColor: theme.colors.surface,
       borderWidth: 1,
       borderColor: theme.colors.border,
+    },
+    cardCompact: {
+      paddingVertical: 8,
+    },
+    cardCompleted: {
+      backgroundColor: theme.colors.primarySoft,
     },
     infoPressable: {
       flex: 1,
@@ -76,8 +89,12 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 13,
       color: theme.colors.textSecondary,
     },
+    countTextDone: {
+      color: theme.colors.primary,
+      fontWeight: '700',
+    },
     plusButton: {
-      minWidth: 68,
+      minWidth: 56,
       borderRadius: 14,
       paddingVertical: 12,
       paddingHorizontal: 14,
@@ -89,6 +106,18 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 16,
       fontWeight: '800',
       color: theme.colors.white,
+    },
+    moreButton: {
+      width: 36,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    moreText: {
+      fontSize: 14,
+      fontWeight: '800',
+      letterSpacing: 1,
+      color: theme.colors.textMuted,
     },
   });
 }

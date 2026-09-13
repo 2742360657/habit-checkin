@@ -1,15 +1,14 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Alert, Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useHabits } from '../state/HabitStore';
 import { Habit } from '../types/habit';
-import { GroupPickerModal } from './GroupPickerModal';
-import { TextEntryModal } from './TextEntryModal';
 
 type HabitActionModalProps = {
   habit: Habit | null;
   visible: boolean;
   onClose: () => void;
+  onEdit: (habitId: string) => void;
   onOpenHistory: (habitId: string) => void;
 };
 
@@ -17,12 +16,11 @@ export function HabitActionModal({
   habit,
   visible,
   onClose,
+  onEdit,
   onOpenHistory,
 }: HabitActionModalProps) {
-  const { theme, renameHabit, moveHabitToGroup, archiveHabit, deleteHabit } = useHabits();
+  const { theme, archiveHabit, deleteHabit } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [editingName, setEditingName] = useState(false);
-  const [editingGroup, setEditingGroup] = useState(false);
 
   if (!habit) {
     return null;
@@ -56,19 +54,23 @@ export function HabitActionModal({
   };
 
   return (
-    <>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
         <View style={styles.overlay}>
           <Pressable style={styles.backdrop} onPress={onClose} />
           <View style={styles.card}>
             <Text style={styles.title}>{habit.name}</Text>
-            <Text style={styles.description}>长按后统一在这里处理习惯设置、归档和历史入口。</Text>
+            <Text style={styles.description}>调整习惯设置，或查看完整的打卡历史。</Text>
 
             <View style={styles.actionList}>
-              <ActionButton label="修改名称" onPress={() => setEditingName(true)} />
-              <ActionButton label="修改所属分组" onPress={() => setEditingGroup(true)} />
               <ActionButton
-                label="打开年视图"
+                label="编辑习惯"
+                onPress={() => {
+                  onEdit(habit.id);
+                  onClose();
+                }}
+              />
+              <ActionButton
+                label="查看历史"
                 onPress={() => {
                   onOpenHistory(habit.id);
                   onClose();
@@ -84,26 +86,6 @@ export function HabitActionModal({
           </View>
         </View>
       </Modal>
-
-      <TextEntryModal
-        visible={editingName}
-        title="修改习惯名称"
-        description="更新后会立即反映在打卡页和历史视图中。"
-        placeholder="输入新的习惯名称"
-        submitLabel="保存"
-        initialValue={habit.name}
-        onClose={() => setEditingName(false)}
-        onSubmit={(value) => renameHabit(habit.id, value)}
-      />
-
-      <GroupPickerModal
-        visible={editingGroup}
-        title="修改所属分组"
-        selectedGroupId={habit.groupId}
-        onClose={() => setEditingGroup(false)}
-        onSubmit={(groupId) => moveHabitToGroup(habit.id, groupId)}
-      />
-    </>
   );
 
   function ActionButton({
@@ -130,9 +112,7 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
   return StyleSheet.create({
     overlay: {
       flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: 24,
+      justifyContent: 'flex-end',
       backgroundColor: 'rgba(18, 31, 24, 0.22)',
     },
     backdrop: {
@@ -140,8 +120,11 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     },
     card: {
       width: '100%',
-      borderRadius: theme.radius.large,
-      padding: 20,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingHorizontal: 20,
+      paddingTop: 22,
+      paddingBottom: 28,
       backgroundColor: theme.colors.surface,
       gap: 14,
       ...theme.shadow,

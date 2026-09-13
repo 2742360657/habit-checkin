@@ -3,6 +3,8 @@ import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity
 
 import { getGroupUsageCount } from '../storage/habitStorage';
 import { useHabits } from '../state/HabitStore';
+import { HabitGroup } from '../types/habit';
+import { ReorderModal } from './ReorderModal';
 import { TextEntryModal } from './TextEntryModal';
 
 type GroupManagerModalProps = {
@@ -11,9 +13,12 @@ type GroupManagerModalProps = {
 };
 
 export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) {
-  const { allHabits, groups, theme, addGroup, deleteGroup } = useHabits();
+  const { allHabits, groups, theme, addGroup, renameGroup, deleteGroup, reorderGroups } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [addingGroup, setAddingGroup] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<HabitGroup | null>(null);
+  const [reorderVisible, setReorderVisible] = useState(false);
+  const orderedGroups = [...groups].sort((left, right) => left.order - right.order);
 
   const handleDeleteGroup = (groupId: string, groupName: string) => {
     const usageCount = getGroupUsageCount(allHabits, groupId);
@@ -38,7 +43,12 @@ export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) 
 
   return (
     <>
-      <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Modal
+        visible={visible && !addingGroup && editingGroup === null && !reorderVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={onClose}
+      >
         <View style={styles.overlay}>
           <Pressable style={styles.backdrop} onPress={onClose} />
           <View style={styles.card}>
@@ -47,9 +57,18 @@ export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) 
                 <Text style={styles.title}>分组管理</Text>
                 <Text style={styles.description}>这里集中管理分组；新增分组也可以直接在打卡页顶部完成。</Text>
               </View>
-              <TouchableOpacity onPress={() => setAddingGroup(true)} style={styles.addButton}>
-                <Text style={styles.addButtonText}>新增</Text>
-              </TouchableOpacity>
+              <View style={styles.headerActions}>
+                <TouchableOpacity
+                  disabled={orderedGroups.length < 2}
+                  onPress={() => setReorderVisible(true)}
+                  style={[styles.secondaryHeaderButton, orderedGroups.length < 2 && styles.disabledButton]}
+                >
+                  <Text style={styles.secondaryHeaderButtonText}>排序</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => setAddingGroup(true)} style={styles.addButton}>
+                  <Text style={styles.addButtonText}>新增</Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
@@ -59,18 +78,23 @@ export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) 
                   <Text style={styles.emptyDescription}>可以创建几个常用分组，例如晨间、运动、学习。</Text>
                 </View>
               ) : (
-                groups.map((group) => (
+                orderedGroups.map((group) => (
                   <View key={group.id} style={styles.row}>
                     <View style={styles.meta}>
                       <Text style={styles.name}>{group.name}</Text>
                       <Text style={styles.usage}>{getGroupUsageCount(allHabits, group.id)} 个习惯</Text>
                     </View>
-                    <TouchableOpacity
-                      onPress={() => handleDeleteGroup(group.id, group.name)}
-                      style={styles.deleteButton}
-                    >
-                      <Text style={styles.deleteButtonText}>删除</Text>
-                    </TouchableOpacity>
+                    <View style={styles.rowActions}>
+                      <TouchableOpacity onPress={() => setEditingGroup(group)} style={styles.editButton}>
+                        <Text style={styles.editButtonText}>重命名</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => handleDeleteGroup(group.id, group.name)}
+                        style={styles.deleteButton}
+                      >
+                        <Text style={styles.deleteButtonText}>删除</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))
               )}
@@ -91,6 +115,27 @@ export function GroupManagerModal({ visible, onClose }: GroupManagerModalProps) 
         submitLabel="保存"
         onClose={() => setAddingGroup(false)}
         onSubmit={addGroup}
+      />
+      <TextEntryModal
+        visible={editingGroup !== null}
+        title="重命名分组"
+        description="修改后会立即更新习惯页中的分组标题。"
+        placeholder="输入新的分组名称"
+        submitLabel="保存"
+        initialValue={editingGroup?.name ?? ''}
+        onClose={() => setEditingGroup(null)}
+        onSubmit={(name) => (editingGroup ? renameGroup(editingGroup.id, name) : false)}
+      />
+      <ReorderModal
+        visible={reorderVisible}
+        title="分组排序"
+        items={orderedGroups.map((group) => ({
+          id: group.id,
+          label: group.name,
+          subtitle: `${getGroupUsageCount(allHabits, group.id)} 个习惯`,
+        }))}
+        onClose={() => setReorderVisible(false)}
+        onSave={reorderGroups}
       />
     </>
   );
@@ -148,6 +193,22 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontWeight: '700',
       color: theme.colors.white,
     },
+    headerActions: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    secondaryHeaderButton: {
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    secondaryHeaderButtonText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.colors.primary,
+    },
+    disabledButton: { opacity: 0.4 },
     list: {
       gap: 10,
     },
@@ -201,6 +262,18 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontSize: 12,
       fontWeight: '700',
       color: theme.colors.danger,
+    },
+    rowActions: { flexDirection: 'row', gap: 7 },
+    editButton: {
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      backgroundColor: theme.colors.surfaceMuted,
+    },
+    editButtonText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.colors.primary,
     },
     closeButton: {
       borderRadius: 12,

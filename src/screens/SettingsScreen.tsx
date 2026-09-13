@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { ArchivedHabitsModal } from '../components/ArchivedHabitsModal';
-import { EditHomeCopyModal } from '../components/EditHomeCopyModal';
 import { GroupManagerModal } from '../components/GroupManagerModal';
+import { ScreenHeader } from '../components/ScreenHeader';
 import { ThemeSelectionModal } from '../components/ThemeSelectionModal';
 import {
   exportBackupFile,
@@ -13,13 +13,12 @@ import {
 import { useHabits } from '../state/HabitStore';
 
 export function SettingsScreen() {
-  const { appData, archivedHabits, groups, settings, theme, replaceAppData } = useHabits();
+  const { appData, archivedHabits, groups, theme, replaceAppData } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
   const [busyAction, setBusyAction] = useState<'backup' | 'restore' | null>(null);
   const [themeVisible, setThemeVisible] = useState(false);
   const [groupManagerVisible, setGroupManagerVisible] = useState(false);
   const [archivedVisible, setArchivedVisible] = useState(false);
-  const [copyVisible, setCopyVisible] = useState(false);
 
   const handleBackup = async () => {
     try {
@@ -73,9 +72,13 @@ export function SettingsScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
+        <ScreenHeader
+          eyebrow="偏好与数据"
+          title="设置"
+          description="不常用的管理项都放在这里，日常操作留给今天页。"
+        />
         <View style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>设置</Text>
-          <Text style={styles.sectionDescription}>大多数设置会收口到二级弹层中处理，避免当前页堆满操作。</Text>
+          <Text style={styles.sectionTitle}>外观与整理</Text>
 
           <SettingRow
             label="色系选择"
@@ -86,11 +89,6 @@ export function SettingsScreen() {
             label="分组管理"
             value={`${groups.length} 个分组`}
             onPress={() => setGroupManagerVisible(true)}
-          />
-          <SettingRow
-            label="打卡页说明文案"
-            value={settings.homeHeroTitle}
-            onPress={() => setCopyVisible(true)}
           />
           <SettingRow
             label="归档习惯"
@@ -128,7 +126,6 @@ export function SettingsScreen() {
       <ThemeSelectionModal visible={themeVisible} onClose={() => setThemeVisible(false)} />
       <GroupManagerModal visible={groupManagerVisible} onClose={() => setGroupManagerVisible(false)} />
       <ArchivedHabitsModal visible={archivedVisible} onClose={() => setArchivedVisible(false)} />
-      <EditHomeCopyModal visible={copyVisible} onClose={() => setCopyVisible(false)} />
     </>
   );
 

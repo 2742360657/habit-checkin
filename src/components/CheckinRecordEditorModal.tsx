@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Modal,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -39,8 +39,8 @@ export function CheckinRecordEditorModal({
 }: CheckinRecordEditorModalProps) {
   const { theme } = useHabits();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const [hour, setHour] = useState(8);
-  const [minute, setMinute] = useState(0);
+  const [hour, setHour] = useState('08');
+  const [minute, setMinute] = useState('00');
   const [note, setNote] = useState(initialNote);
 
   useEffect(() => {
@@ -49,14 +49,19 @@ export function CheckinRecordEditorModal({
     }
 
     const next = getInitialParts(dateKey, initialTimestamp);
-    setHour(next.hour);
-    setMinute(next.minute);
+    setHour(String(next.hour).padStart(2, '0'));
+    setMinute(String(next.minute).padStart(2, '0'));
     setNote(initialNote);
   }, [dateKey, initialNote, initialTimestamp, visible]);
 
   const handleSubmit = () => {
-    const timestamp = buildTimestampForDateTime(dateKey, hour, minute);
+    if (!/^\d{1,2}$/.test(hour) || !/^\d{1,2}$/.test(minute)) {
+      Alert.alert('时间格式有误', '请输入有效的小时和分钟。');
+      return;
+    }
+    const timestamp = buildTimestampForDateTime(dateKey, Number(hour), Number(minute));
     if (timestamp === null) {
+      Alert.alert('时间格式有误', '小时应为 0–23，分钟应为 0–59。');
       return;
     }
 
@@ -70,21 +75,37 @@ export function CheckinRecordEditorModal({
         <Pressable style={styles.backdrop} onPress={onClose} />
         <View style={styles.card}>
           <Text style={styles.title}>{title}</Text>
-          <Text style={styles.description}>时间通过选择器设置，精确到分钟；备注可以为空。</Text>
+          <Text style={styles.description}>直接输入时间，或使用下面的快捷分钟；备注可以为空。</Text>
 
           <View style={styles.timePicker}>
-            <TimeColumn
+            <TimeField
               title="小时"
-              values={Array.from({ length: 24 }, (_, index) => index)}
-              selectedValue={hour}
-              onSelect={setHour}
+              value={hour}
+              onChange={setHour}
             />
-            <TimeColumn
+            <Text style={styles.timeColon}>:</Text>
+            <TimeField
               title="分钟"
-              values={Array.from({ length: 60 }, (_, index) => index)}
-              selectedValue={minute}
-              onSelect={setMinute}
+              value={minute}
+              onChange={setMinute}
             />
+          </View>
+          <View style={styles.quickRow}>
+            <TouchableOpacity
+              onPress={() => {
+                const now = new Date();
+                setHour(String(now.getHours()).padStart(2, '0'));
+                setMinute(String(now.getMinutes()).padStart(2, '0'));
+              }}
+              style={styles.quickButton}
+            >
+              <Text style={styles.quickButtonText}>现在</Text>
+            </TouchableOpacity>
+            {['00', '15', '30', '45'].map((value) => (
+              <TouchableOpacity key={value} onPress={() => setMinute(value)} style={styles.quickButton}>
+                <Text style={styles.quickButtonText}>:{value}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
           <View style={styles.noteField}>
@@ -113,36 +134,26 @@ export function CheckinRecordEditorModal({
     </Modal>
   );
 
-  function TimeColumn({
+  function TimeField({
     title,
-    values,
-    selectedValue,
-    onSelect,
+    value,
+    onChange,
   }: {
     title: string;
-    values: number[];
-    selectedValue: number;
-    onSelect: (value: number) => void;
+    value: string;
+    onChange: (value: string) => void;
   }) {
     return (
-      <View style={styles.timeColumn}>
+      <View style={styles.timeField}>
         <Text style={styles.timeColumnTitle}>{title}</Text>
-        <ScrollView style={styles.timeList} showsVerticalScrollIndicator={false}>
-          {values.map((value) => {
-            const selected = selectedValue === value;
-            return (
-              <TouchableOpacity
-                key={`${title}-${value}`}
-                onPress={() => onSelect(value)}
-                style={[styles.timeOption, selected && styles.timeOptionActive]}
-              >
-                <Text style={[styles.timeOptionText, selected && styles.timeOptionTextActive]}>
-                  {String(value).padStart(2, '0')}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+        <TextInput
+          keyboardType="number-pad"
+          maxLength={2}
+          selectTextOnFocus
+          value={value}
+          onChangeText={(next) => onChange(next.replace(/\D/g, ''))}
+          style={styles.timeInput}
+        />
       </View>
     );
   }
@@ -181,10 +192,12 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
     },
     timePicker: {
       flexDirection: 'row',
-      gap: 12,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
+      gap: 14,
     },
-    timeColumn: {
-      flex: 1,
+    timeField: {
+      width: 112,
       gap: 8,
     },
     timeColumnTitle: {
@@ -192,25 +205,36 @@ function createStyles(theme: ReturnType<typeof useHabits>['theme']) {
       fontWeight: '700',
       color: theme.colors.textPrimary,
     },
-    timeList: {
-      maxHeight: 180,
-      borderRadius: theme.radius.medium,
-      backgroundColor: theme.colors.background,
+    timeInput: {
+      height: 68,
+      borderRadius: 18,
+      textAlign: 'center',
+      fontSize: 30,
+      fontWeight: '800',
+      color: theme.colors.primary,
+      backgroundColor: theme.colors.primarySoft,
       borderWidth: 1,
       borderColor: theme.colors.border,
     },
-    timeOption: {
-      paddingVertical: 10,
+    timeColon: {
+      paddingBottom: 16,
+      fontSize: 30,
+      fontWeight: '800',
+      color: theme.colors.textSecondary,
+    },
+    quickRow: {
+      flexDirection: 'row',
+      gap: 7,
+    },
+    quickButton: {
+      flex: 1,
+      borderRadius: 11,
+      paddingVertical: 9,
       alignItems: 'center',
+      backgroundColor: theme.colors.surfaceMuted,
     },
-    timeOptionActive: {
-      backgroundColor: theme.colors.primarySoft,
-    },
-    timeOptionText: {
-      fontSize: 16,
-      color: theme.colors.textPrimary,
-    },
-    timeOptionTextActive: {
+    quickButtonText: {
+      fontSize: 12,
       fontWeight: '700',
       color: theme.colors.primary,
     },
